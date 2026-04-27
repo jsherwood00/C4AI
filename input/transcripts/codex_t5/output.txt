@@ -1,0 +1,2841 @@
+rt1@rt1:~/Documents/phase2/connect4/codexfast_s/t5/init$ sudo ./run.sh
+[sudo] password for rt1: 
+[+] Building 0.4s (19/19) FINISHED                               docker:default
+ => [internal] load build definition from Dockerfile                       0.0s
+ => => transferring dockerfile: 1.32kB                                     0.0s
+ => [internal] load metadata for docker.io/nvidia/cuda:12.8.0-devel-ubunt  0.3s
+ => [internal] load .dockerignore                                          0.0s
+ => => transferring context: 2B                                            0.0s
+ => [ 1/14] FROM docker.io/nvidia/cuda:12.8.0-devel-ubuntu24.04@sha256:9a  0.0s
+ => [internal] load build context                                          0.0s
+ => => transferring context: 65B                                           0.0s
+ => CACHED [ 2/14] RUN apt-get update && apt-get install -y --no-install-  0.0s
+ => CACHED [ 3/14] RUN curl -fsSL https://deb.nodesource.com/setup_22.x |  0.0s
+ => CACHED [ 4/14] RUN npm install -g @openai/codex                        0.0s
+ => CACHED [ 5/14] RUN pip install --break-system-packages --pre torch --  0.0s
+ => CACHED [ 6/14] RUN pip install --break-system-packages numpy pytest t  0.0s
+ => CACHED [ 7/14] RUN pip install --break-system-packages numpy pytest t  0.0s
+ => CACHED [ 8/14] RUN usermod -l codex -d /home/codex -m ubuntu && group  0.0s
+ => CACHED [ 9/14] RUN mkdir -p /workspace /output && chown codex:codex /  0.0s
+ => CACHED [10/14] COPY squid.conf /etc/squid/squid.conf                   0.0s
+ => CACHED [11/14] RUN mkdir -p /var/log/squid && chown proxy:proxy /var/  0.0s
+ => CACHED [12/14] COPY entrypoint.sh /entrypoint.sh                       0.0s
+ => CACHED [13/14] RUN chmod +x /entrypoint.sh                             0.0s
+ => CACHED [14/14] WORKDIR /workspace                                      0.0s
+ => exporting to image                                                     0.0s
+ => => exporting layers                                                    0.0s
+ => => writing image sha256:f303e8ec7c81f76f83e0c18e582a596a2d1c7afdccd8b  0.0s
+ => => naming to docker.io/library/codex-sandbox                           0.0s
+Waiting for Squid to listen on port 3128... (1/30)
+Squid proxy is ready on port 3128.
+Script started, output log file is '/workspace/session.log'.
+╭─────────────────────────────────────────────────╮
+│ ✨ Update available! 0.111.0 -> 0.118.0         │
+│ Run npm install -g @openai/codex to update.     │
+│                                                 │
+│ See full release notes:                         │
+│ https://github.com/openai/codex/releases/latest │
+╰─────────────────────────────────────────────────╯
+
+╭────────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.111.0)                         │
+│                                                    │
+│ model:     gpt-5.4 xhigh   fast   /model to change │
+│ directory: /workspace                              │
+╰────────────────────────────────────────────────────╯
+
+  Tip: New 2x rate limits until April 2nd.
+
+
+› Hi Codex, please complete the project as specified in project_spec.md
+
+
+• I’m reading project_spec.md and the repository structure first so I can
+  implement against the actual code and constraints rather than guessing.
+
+• Ran pwd
+  └ /workspace
+
+• Explored
+  └ List workspace
+    Read project_spec.md
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The workspace is effectively empty apart from the spec, so I’m building this
+  from scratch. I’m checking the deadline metadata and environment next, then
+  I’ll lay down the game, tests, training pipeline, and evaluation scripts in
+  that order.
+
+• Explored
+  └ List workspace
+    List workspace
+
+• Ran date -u '+%Y-%m-%d %H:%M:%S UTC'
+  └ 2026-04-04 00:07:18 UTC
+
+• Ran if [ -f /workspace/.deadline ]; then sed -n '1,120p' /workspace/.deadline;
+  │ fi
+  └ Start time: Fri Apr  3 19:06:59 CDT 2026
+    End time: Fri Apr  3 22:06:59 CDT 2026
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’ve confirmed the 3-hour window runs from April 3, 2026 19:06:59 CDT to
+  22:06:59 CDT. I’m locking the implementation plan now so the work stays
+  sequenced around correctness first, then training, then evaluation packaging.
+
+• Updated Plan
+  └ Building the project from an empty workspace. Order is driven by correctness
+    and testability before longer training runs.
+    □ Create project scaffold, CODEX.md, and fully tested Connect 4 game/CLI
+      primitives
+    □ Implement neural net, MCTS, replay buffer, checkpointing, signal handling,
+      and training/eval CLIs
+    □ Add player.sh/setup.sh, run tests, execute a training run, and validate e
+      nd-to-end behavior
+
+• I have enough context to start writing files. I’m laying down the project
+  skeleton, the core game engine, the first CLI, and a thorough test suite for
+  the game rules before I move into the neural and training pieces.
+
+• Ran mkdir -p /workspace/connect4_zero /workspace/tests /workspace/artifacts
+  └ (no output)
+
+• Edited 7 files (+472 -0)
+  └ CODEX.md (+24 -0)
+     1 +# CODEX Notes
+     2 +
+     3 +## Goal
+     4 +- Build a fully tested Connect 4 implementation.
+     5 +- Train an AlphaZero-style agent with MCTS self-play, checkpointing, res
+        ume support, and a terminal human-vs-model mode.
+     6 +- Package an evaluation entrypoint through `player.sh`.
+     7 +
+     8 +## Deadline
+     9 +- Start: Fri Apr 3 19:06:59 CDT 2026
+    10 +- End: Fri Apr 3 22:06:59 CDT 2026
+    11 +
+    12 +## Current Progress
+    13 +- Initialized project structure.
+    14 +- Implemented the core Connect 4 rules engine and terminal human-vs-huma
+        n mode.
+    15 +- Added thorough unit tests for move application, win detection, seriali
+        zation, and display helpers.
+    16 +
+    17 +## Design Decisions
+    18 +- Board storage uses shape `(6, 7)` with row `0` as the bottom row. This
+         matches the drop mechanic directly and keeps move application simple.
+    19 +- Columns are represented internally as zero-based indices and externall
+        y as digits `1-7`.
+    20 +- Game states are immutable snapshots: each move returns a new `GameStat
+        e`. This keeps MCTS tree expansion and replay-buffer bookkeeping safer.
+    21 +
+    22 +## Known Issues / TODO
+    23 +- Implement neural network, MCTS, replay buffer, training loop, checkpoi
+        nting, and human-vs-model mode.
+    24 +- Add evaluation entrypoint and training artifacts.
+
+  └ connect4_zero/__init__.py (+5 -0)
+    1 +"""Connect 4 AlphaZero-style training project."""
+    2 +
+    3 +from .game import COLS, ROWS, GameState, apply_move_string, opponent
+    4 +
+    5 +__all__ = ["COLS", "ROWS", "GameState", "apply_move_string", "opponent"]
+
+  └ connect4_zero/__main__.py (+5 -0)
+    1 +from .cli import main
+    2 +
+    3 +
+    4 +if __name__ == "__main__":
+    5 +    main()
+
+  └ connect4_zero/cli.py (+51 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +import argparse
+     4 +
+     5 +from .game import COLS, GameState
+     6 +
+     7 +
+     8 +def _read_human_move(state: GameState) -> int:
+     9 +    while True:
+    10 +        raw = input(f"Player {'X' if state.current_player == 1 else 'O'}
+         choose column (1-{COLS}): ").strip()
+    11 +        if raw not in {str(index) for index in range(1, COLS + 1)}:
+    12 +            print("Please enter a column number from 1 to 7.")
+    13 +            continue
+    14 +        move = int(raw) - 1
+    15 +        if not state.is_legal_move(move):
+    16 +            print("That column is full or the game is already over. Choo
+        se another column.")
+    17 +            continue
+    18 +        return move
+    19 +
+    20 +
+    21 +def play_human_vs_human() -> None:
+    22 +    state = GameState.initial()
+    23 +    print(state.pretty())
+    24 +    while not state.is_terminal:
+    25 +        state = state.apply_move(_read_human_move(state))
+    26 +        print()
+    27 +        print(state.pretty())
+    28 +    print()
+    29 +    if state.is_draw:
+    30 +        print("Game over: draw.")
+    31 +    else:
+    32 +        print(f"Game over: {'X' if state.winner == 1 else 'O'} wins.")
+    33 +
+    34 +
+    35 +def build_parser() -> argparse.ArgumentParser:
+    36 +    parser = argparse.ArgumentParser(description="Connect 4 project entr
+        ypoint")
+    37 +    subparsers = parser.add_subparsers(dest="command", required=True)
+    38 +    subparsers.add_parser("play-human", help="Play human vs human in the
+         terminal")
+    39 +    return parser
+    40 +
+    41 +
+    42 +def main() -> None:
+    43 +    args = build_parser().parse_args()
+    44 +    if args.command == "play-human":
+    45 +        play_human_vs_human()
+    46 +        return
+    47 +    raise ValueError(f"unknown command: {args.command}")
+    48 +
+    49 +
+    50 +if __name__ == "__main__":
+    51 +    main()
+
+  └ connect4_zero/game.py (+212 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +from dataclasses import dataclass
+      4 +from typing import Iterable
+      5 +
+      6 +import numpy as np
+      7 +
+      8 +ROWS = 6
+      9 +COLS = 7
+     10 +CONNECT_N = 4
+     11 +
+     12 +
+     13 +def opponent(player: int) -> int:
+     14 +    """Return the opposing player marker."""
+     15 +    if player not in (-1, 1):
+     16 +        raise ValueError(f"player must be -1 or 1, got {player}")
+     17 +    return -player
+     18 +
+     19 +
+     20 +def _validate_board(board: np.ndarray) -> np.ndarray:
+     21 +    array = np.asarray(board, dtype=np.int8)
+     22 +    if array.shape != (ROWS, COLS):
+     23 +        raise ValueError(f"board must have shape {(ROWS, COLS)}, got {a
+         rray.shape}")
+     24 +    if not np.isin(array, (-1, 0, 1)).all():
+     25 +        raise ValueError("board values must be -1, 0, or 1")
+     26 +    return array.copy()
+     27 +
+     28 +
+     29 +def _has_connect_from(board: np.ndarray, row: int, col: int, player: in
+         t) -> bool:
+     30 +    """Check the four principal directions through a newly placed piece
+         ."""
+     31 +    for delta_row, delta_col in ((1, 0), (0, 1), (1, 1), (1, -1)):
+     32 +        streak = 1
+     33 +        for direction in (-1, 1):
+     34 +            step = 1
+     35 +            while True:
+     36 +                next_row = row + direction * step * delta_row
+     37 +                next_col = col + direction * step * delta_col
+     38 +                if not (0 <= next_row < ROWS and 0 <= next_col < COLS):
+     39 +                    break
+     40 +                if board[next_row, next_col] != player:
+     41 +                    break
+     42 +                streak += 1
+     43 +                step += 1
+     44 +        if streak >= CONNECT_N:
+     45 +            return True
+     46 +    return False
+     47 +
+     48 +
+     49 +def _find_winner(board: np.ndarray) -> int:
+     50 +    """Scan the board for either player's winning line."""
+     51 +    for row in range(ROWS):
+     52 +        for col in range(COLS):
+     53 +            player = int(board[row, col])
+     54 +            if player == 0:
+     55 +                continue
+     56 +            if _has_connect_from(board, row, col, player):
+     57 +                return player
+     58 +    return 0
+     59 +
+     60 +
+     61 +def moves_to_string(moves: Iterable[int]) -> str:
+     62 +    """Convert zero-based internal moves to the competition format."""
+     63 +    digits: list[str] = []
+     64 +    for move in moves:
+     65 +        if not 0 <= move < COLS:
+     66 +            raise ValueError(f"move must be in [0, {COLS - 1}], got {mo
+         ve}")
+     67 +        digits.append(str(move + 1))
+     68 +    return "".join(digits)
+     69 +
+     70 +
+     71 +@dataclass(frozen=True, slots=True)
+     72 +class GameState:
+     73 +    """Immutable Connect 4 position."""
+     74 +
+     75 +    board: np.ndarray
+     76 +    current_player: int = 1
+     77 +    winner: int = 0
+     78 +    move_count: int = 0
+     79 +    is_draw: bool = False
+     80 +    last_move: int | None = None
+     81 +    last_row: int | None = None
+     82 +
+     83 +    def __post_init__(self) -> None:
+     84 +        board = _validate_board(self.board)
+     85 +        object.__setattr__(self, "board", board)
+     86 +        if self.current_player not in (-1, 1):
+     87 +            raise ValueError(f"current_player must be -1 or 1, got {sel
+         f.current_player}")
+     88 +        if self.winner not in (-1, 0, 1):
+     89 +            raise ValueError(f"winner must be -1, 0, or 1, got {self.wi
+         nner}")
+     90 +        if self.move_count < 0 or self.move_count > ROWS * COLS:
+     91 +            raise ValueError(f"invalid move_count: {self.move_count}")
+     92 +        if self.last_move is not None and not 0 <= self.last_move < COL
+         S:
+     93 +            raise ValueError(f"last_move must be in [0, {COLS - 1}], go
+         t {self.last_move}")
+     94 +        if self.last_row is not None and not 0 <= self.last_row < ROWS:
+     95 +            raise ValueError(f"last_row must be in [0, {ROWS - 1}], got
+          {self.last_row}")
+     96 +
+     97 +    @classmethod
+     98 +    def initial(cls) -> "GameState":
+     99 +        return cls(board=np.zeros((ROWS, COLS), dtype=np.int8))
+    100 +
+    101 +    @classmethod
+    102 +    def from_board(cls, board: np.ndarray, current_player: int = 1) ->
+         "GameState":
+    103 +        checked = _validate_board(board)
+    104 +        move_count = int(np.count_nonzero(checked))
+    105 +        winner = _find_winner(checked)
+    106 +        is_draw = winner == 0 and move_count == ROWS * COLS
+    107 +        return cls(
+    108 +            board=checked,
+    109 +            current_player=current_player,
+    110 +            winner=winner,
+    111 +            move_count=move_count,
+    112 +            is_draw=is_draw,
+    113 +        )
+    114 +
+    115 +    @classmethod
+    116 +    def from_move_string(cls, move_string: str) -> "GameState":
+    117 +        return apply_move_string(cls.initial(), move_string)
+    118 +
+    119 +    @property
+    120 +    def is_terminal(self) -> bool:
+    121 +        return self.winner != 0 or self.is_draw
+    122 +
+    123 +    def legal_moves(self) -> tuple[int, ...]:
+    124 +        if self.is_terminal:
+    125 +            return ()
+    126 +        return tuple(col for col in range(COLS) if self.board[ROWS - 1,
+          col] == 0)
+    127 +
+    128 +    def legal_move_mask(self) -> np.ndarray:
+    129 +        mask = np.zeros(COLS, dtype=np.float32)
+    130 +        for move in self.legal_moves():
+    131 +            mask[move] = 1.0
+    132 +        return mask
+    133 +
+    134 +    def available_row(self, column: int) -> int | None:
+    135 +        if not 0 <= column < COLS:
+    136 +            raise ValueError(f"column must be in [0, {COLS - 1}], got {
+         column}")
+    137 +        column_data = self.board[:, column]
+    138 +        empty_rows = np.flatnonzero(column_data == 0)
+    139 +        if empty_rows.size == 0:
+    140 +            return None
+    141 +        return int(empty_rows[0])
+    142 +
+    143 +    def is_legal_move(self, column: int) -> bool:
+    144 +        try:
+    145 +            return self.available_row(column) is not None and not self.
+         is_terminal
+    146 +        except ValueError:
+    147 +            return False
+    148 +
+    149 +    def apply_move(self, column: int) -> "GameState":
+    150 +        if self.is_terminal:
+    151 +            raise ValueError("cannot play moves in a terminal position"
+         )
+    152 +        row = self.available_row(column)
+    153 +        if row is None:
+    154 +            raise ValueError(f"column {column + 1} is full")
+    155 +        next_board = self.board.copy()
+    156 +        next_board[row, column] = self.current_player
+    157 +        winner = self.current_player if _has_connect_from(next_board, r
+         ow, column, self.current_player) else 0
+    158 +        move_count = self.move_count + 1
+    159 +        is_draw = winner == 0 and move_count == ROWS * COLS
+    160 +        return GameState(
+    161 +            board=next_board,
+    162 +            current_player=opponent(self.current_player),
+    163 +            winner=winner,
+    164 +            move_count=move_count,
+    165 +            is_draw=is_draw,
+    166 +            last_move=column,
+    167 +            last_row=row,
+    168 +        )
+    169 +
+    170 +    def result_for_player(self, player: int) -> float:
+    171 +        if not self.is_terminal:
+    172 +            raise ValueError("result is only defined for terminal posit
+         ions")
+    173 +        if self.is_draw:
+    174 +            return 0.0
+    175 +        return 1.0 if self.winner == player else -1.0
+    176 +
+    177 +    def encode(self) -> np.ndarray:
+    178 +        """Encode from the current player's perspective for the neural
+         net."""
+    179 +        current_plane = (self.board == self.current_player).astype(np.f
+         loat32)
+    180 +        opponent_plane = (self.board == opponent(self.current_player)).
+         astype(np.float32)
+    181 +        player_plane = np.full((ROWS, COLS), 1.0 if self.current_player
+          == 1 else 0.0, dtype=np.float32)
+    182 +        return np.stack([current_plane, opponent_plane, player_plane],
+         axis=0)
+    183 +
+    184 +    def mirrored(self) -> "GameState":
+    185 +        mirrored_board = np.flip(self.board, axis=1).copy()
+    186 +        mirrored_last_move = None if self.last_move is None else COLS -
+          1 - self.last_move
+    187 +        return GameState(
+    188 +            board=mirrored_board,
+    189 +            current_player=self.current_player,
+    190 +            winner=self.winner,
+    191 +            move_count=self.move_count,
+    192 +            is_draw=self.is_draw,
+    193 +            last_move=mirrored_last_move,
+    194 +            last_row=self.last_row,
+    195 +        )
+    196 +
+    197 +    def pretty(self) -> str:
+    198 +        symbols = {0: ".", 1: "X", -1: "O"}
+    199 +        lines = ["1 2 3 4 5 6 7"]
+    200 +        for row in range(ROWS - 1, -1, -1):
+    201 +            lines.append(" ".join(symbols[int(cell)] for cell in self.b
+         oard[row]))
+    202 +        return "\n".join(lines)
+    203 +
+    204 +
+    205 +def apply_move_string(state: GameState, move_string: str) -> GameState:
+    206 +    """Apply the competition move-string format to a state."""
+    207 +    next_state = state
+    208 +    for char in move_string.strip():
+    209 +        if char not in "1234567":
+    210 +            raise ValueError(f"invalid move character: {char!r}")
+    211 +        next_state = next_state.apply_move(int(char) - 1)
+    212 +    return next_state
+
+  └ pyproject.toml (+13 -0)
+     1 +[build-system]
+     2 +requires = ["setuptools>=68"]
+     3 +build-backend = "setuptools.build_meta"
+     4 +
+     5 +[project]
+     6 +name = "connect4-zero"
+     7 +version = "0.1.0"
+     8 +description = "Text-based Connect 4 with AlphaZero-style training"
+     9 +requires-python = ">=3.12"
+    10 +dependencies = []
+    11 +
+    12 +[tool.pytest.ini_options]
+    13 +testpaths = ["tests"]
+
+  └ tests/test_game.py (+162 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import numpy as np
+      4 +import pytest
+      5 +
+      6 +from connect4_zero.game import COLS, ROWS, GameState, apply_move_string
+         , moves_to_string, opponent
+      7 +
+      8 +
+      9 +def test_opponent_requires_valid_player() -> None:
+     10 +    assert opponent(1) == -1
+     11 +    assert opponent(-1) == 1
+     12 +    with pytest.raises(ValueError):
+     13 +        opponent(0)
+     14 +
+     15 +
+     16 +def test_initial_state_is_empty_and_playable() -> None:
+     17 +    state = GameState.initial()
+     18 +    assert state.current_player == 1
+     19 +    assert state.winner == 0
+     20 +    assert state.move_count == 0
+     21 +    assert not state.is_terminal
+     22 +    assert state.legal_moves() == tuple(range(COLS))
+     23 +    assert np.count_nonzero(state.board) == 0
+     24 +
+     25 +
+     26 +def test_apply_move_drops_piece_to_lowest_row_and_toggles_turn() -> Non
+         e:
+     27 +    state = GameState.initial()
+     28 +    next_state = state.apply_move(3)
+     29 +    assert next_state.board[0, 3] == 1
+     30 +    assert next_state.current_player == -1
+     31 +    stacked_state = next_state.apply_move(3)
+     32 +    assert stacked_state.board[1, 3] == -1
+     33 +    assert stacked_state.current_player == 1
+     34 +
+     35 +
+     36 +def test_available_row_and_legal_move_checks() -> None:
+     37 +    state = GameState.initial()
+     38 +    assert state.available_row(0) == 0
+     39 +    for _ in range(ROWS):
+     40 +        state = state.apply_move(0)
+     41 +        if not state.is_terminal:
+     42 +            state = state.apply_move(1)
+     43 +    assert state.available_row(0) is None
+     44 +    assert not state.is_legal_move(0)
+     45 +    with pytest.raises(ValueError):
+     46 +        state.available_row(-1)
+     47 +
+     48 +
+     49 +def test_full_column_rejected() -> None:
+     50 +    state = GameState.initial()
+     51 +    for _ in range(ROWS):
+     52 +        state = state.apply_move(0)
+     53 +        if not state.is_terminal:
+     54 +            state = state.apply_move(1)
+     55 +    with pytest.raises(ValueError, match="full"):
+     56 +        state.apply_move(0)
+     57 +
+     58 +
+     59 +def test_horizontal_win_detected() -> None:
+     60 +    state = GameState.initial()
+     61 +    for move in [0, 0, 1, 1, 2, 2]:
+     62 +        state = state.apply_move(move)
+     63 +    winning_state = state.apply_move(3)
+     64 +    assert winning_state.winner == 1
+     65 +    assert winning_state.is_terminal
+     66 +    assert winning_state.result_for_player(1) == 1.0
+     67 +    assert winning_state.result_for_player(-1) == -1.0
+     68 +
+     69 +
+     70 +def test_vertical_win_detected() -> None:
+     71 +    state = GameState.initial()
+     72 +    for move in [0, 1, 0, 1, 0, 1]:
+     73 +        state = state.apply_move(move)
+     74 +    winning_state = state.apply_move(0)
+     75 +    assert winning_state.winner == 1
+     76 +    assert winning_state.last_row == 3
+     77 +
+     78 +
+     79 +def test_rising_diagonal_win_detected() -> None:
+     80 +    state = GameState.initial()
+     81 +    for move in [0, 1, 1, 2, 2, 3, 2, 3, 3, 6]:
+     82 +        state = state.apply_move(move)
+     83 +    winning_state = state.apply_move(3)
+     84 +    assert winning_state.winner == 1
+     85 +
+     86 +
+     87 +def test_falling_diagonal_win_detected() -> None:
+     88 +    state = GameState.initial()
+     89 +    for move in [3, 2, 2, 1, 1, 0, 1, 0, 0, 6]:
+     90 +        state = state.apply_move(move)
+     91 +    winning_state = state.apply_move(0)
+     92 +    assert winning_state.winner == 1
+     93 +
+     94 +
+     95 +def test_draw_detected_from_full_board() -> None:
+     96 +    board = np.array(
+     97 +        [
+     98 +            [1, 1, -1, -1, 1, 1, -1],
+     99 +            [-1, -1, 1, 1, -1, -1, 1],
+    100 +            [1, 1, -1, -1, 1, 1, -1],
+    101 +            [-1, -1, 1, 1, -1, -1, 1],
+    102 +            [1, 1, -1, -1, 1, 1, -1],
+    103 +            [-1, -1, 1, 1, -1, -1, 1],
+    104 +        ],
+    105 +        dtype=np.int8,
+    106 +    )
+    107 +    state = GameState.from_board(board, current_player=1)
+    108 +    assert state.winner == 0
+    109 +    assert state.is_draw
+    110 +    assert state.is_terminal
+    111 +    assert state.result_for_player(1) == 0.0
+    112 +
+    113 +
+    114 +def test_legal_moves_empty_for_terminal_state() -> None:
+    115 +    state = GameState.initial()
+    116 +    for move in [0, 0, 1, 1, 2, 2, 3]:
+    117 +        state = state.apply_move(move)
+    118 +    assert state.is_terminal
+    119 +    assert state.legal_moves() == ()
+    120 +    with pytest.raises(ValueError, match="terminal"):
+    121 +        state.apply_move(4)
+    122 +
+    123 +
+    124 +def test_encode_marks_current_and_opponent_planes() -> None:
+    125 +    state = GameState.initial().apply_move(0).apply_move(1)
+    126 +    encoded = state.encode()
+    127 +    assert encoded.shape == (3, ROWS, COLS)
+    128 +    assert encoded[0, 0, 1] == 1.0
+    129 +    assert encoded[1, 0, 0] == 1.0
+    130 +    assert np.all(encoded[2] == 1.0)
+    131 +
+    132 +
+    133 +def test_mirrored_flips_board_and_last_move() -> None:
+    134 +    state = GameState.initial().apply_move(1).apply_move(3)
+    135 +    mirrored = state.mirrored()
+    136 +    assert np.array_equal(mirrored.board, np.flip(state.board, axis=1))
+    137 +    assert mirrored.last_move == COLS - 1 - state.last_move
+    138 +    assert mirrored.current_player == state.current_player
+    139 +
+    140 +
+    141 +def test_pretty_print_matches_expected_orientation() -> None:
+    142 +    state = GameState.initial().apply_move(0).apply_move(1)
+    143 +    pretty = state.pretty().splitlines()
+    144 +    assert pretty[0] == "1 2 3 4 5 6 7"
+    145 +    assert pretty[-1] == "X O . . . . ."
+    146 +
+    147 +
+    148 +def test_move_string_round_trip() -> None:
+    149 +    moves = [0, 3, 6, 2]
+    150 +    move_string = moves_to_string(moves)
+    151 +    assert move_string == "1473"
+    152 +    state = apply_move_string(GameState.initial(), move_string)
+    153 +    assert state.move_count == len(moves)
+    154 +    assert state.board[0, 0] == 1
+    155 +    assert state.board[0, 3] == -1
+    156 +    assert state.board[0, 6] == 1
+    157 +    assert state.board[0, 2] == -1
+    158 +
+    159 +
+    160 +def test_from_move_string_rejects_invalid_characters() -> None:
+    161 +    with pytest.raises(ValueError):
+    162 +        GameState.from_move_string("128")
+
+─ Worked for 1m 51s ────────────────────────────────────────────────────────────
+
+• The core rules engine and first tests are in place. I’m running the game test
+  suite now and will fix anything that breaks before adding the training stack.
+
+• Ran pytest -q /workspace/tests/test_game.py
+  └
+    ==================================== ERRORS
+    … +16 lines
+    collection !!!!!!!!!!!!!!!!!!!!
+    1 error in 0.12s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• Pytest isn’t seeing the package from the workspace path, so I’m fixing the
+  test import path rather than relying on environment quirks.
+
+• Added tests/conftest.py (+8 -0)
+    1 +from __future__ import annotations
+    2 +
+    3 +import sys
+    4 +from pathlib import Path
+    5 +
+    6 +ROOT = Path(__file__).resolve().parents[1]
+    7 +if str(ROOT) not in sys.path:
+    8 +    sys.path.insert(0, str(ROOT))
+
+• Ran pytest -q /workspace/tests/test_game.py
+  └ ...FF......F....
+    [100%]
+    … +65 lines
+    as...
+    3 failed, 13 passed in 0.10s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• Two of the failures are test-shape issues, not engine bugs: the test was
+  accidentally constructing a terminal win while trying to fill a column, and
+  the encoding expectation was flipped relative to the current-player
+  perspective. I’m correcting those now and rerunning the suite.
+
+• Edited tests/test_game.py (+8 -13)
+     36  def test_available_row_and_legal_move_checks() -> None:
+     37 -    state = GameState.initial()
+     38 -    assert state.available_row(0) == 0
+     39 -    for _ in range(ROWS):
+     40 -        state = state.apply_move(0)
+     41 -        if not state.is_terminal:
+     42 -            state = state.apply_move(1)
+     37 +    board = np.zeros((ROWS, COLS), dtype=np.int8)
+     38 +    board[:, 0] = np.array([1, -1, 1, -1, 1, -1], dtype=np.int8)
+     39 +    state = GameState.from_board(board)
+     40      assert state.available_row(0) is None
+        ⋮
+     46  def test_full_column_rejected() -> None:
+     50 -    state = GameState.initial()
+     51 -    for _ in range(ROWS):
+     52 -        state = state.apply_move(0)
+     53 -        if not state.is_terminal:
+     54 -            state = state.apply_move(1)
+     47 +    board = np.zeros((ROWS, COLS), dtype=np.int8)
+     48 +    board[:, 0] = np.array([1, -1, 1, -1, 1, -1], dtype=np.int8)
+     49 +    state = GameState.from_board(board)
+     50      with pytest.raises(ValueError, match="full"):
+        ⋮
+    122      assert encoded.shape == (3, ROWS, COLS)
+    128 -    assert encoded[0, 0, 1] == 1.0
+    129 -    assert encoded[1, 0, 0] == 1.0
+    123 +    assert encoded[0, 0, 0] == 1.0
+    124 +    assert encoded[1, 0, 1] == 1.0
+    125      assert np.all(encoded[2] == 1.0)
+
+• Ran pytest -q /workspace/tests/test_game.py
+  └
+    16 passed in 0.06s
+
+─ Worked for 2m 19s ────────────────────────────────────────────────────────────
+
+• I’m moving into the AlphaZero stack now: model, replay buffer, MCTS,
+  checkpointing, and the training loop. After that I’ll extend the CLI and then
+  run the broader test suite.
+
+• Edited 7 files (+922 -4)
+  └ connect4_zero/checkpoint.py (+106 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import random
+      4 +from dataclasses import asdict, is_dataclass
+      5 +from pathlib import Path
+      6 +from typing import Any
+      7 +
+      8 +import numpy as np
+      9 +import torch
+     10 +
+     11 +from .model import Connect4Net, NetworkConfig
+     12 +from .replay import ReplayBuffer
+     13 +
+     14 +
+     15 +def seed_everything(seed: int) -> None:
+     16 +    random.seed(seed)
+     17 +    np.random.seed(seed)
+     18 +    torch.manual_seed(seed)
+     19 +    if torch.cuda.is_available():
+     20 +        torch.cuda.manual_seed_all(seed)
+     21 +
+     22 +
+     23 +def capture_rng_state(generator: np.random.Generator) -> dict[str, Any]
+         :
+     24 +    state: dict[str, Any] = {
+     25 +        "python_random": random.getstate(),
+     26 +        "numpy_random": np.random.get_state(),
+     27 +        "torch_random": torch.random.get_rng_state(),
+     28 +        "generator_state": generator.bit_generator.state,
+     29 +    }
+     30 +    if torch.cuda.is_available():
+     31 +        state["torch_cuda_random"] = torch.cuda.get_rng_state_all()
+     32 +    return state
+     33 +
+     34 +
+     35 +def restore_rng_state(state: dict[str, Any], generator: np.random.Gener
+         ator) -> None:
+     36 +    random.setstate(state["python_random"])
+     37 +    np.random.set_state(state["numpy_random"])
+     38 +    torch.random.set_rng_state(state["torch_random"])
+     39 +    generator.bit_generator.state = state["generator_state"]
+     40 +    if torch.cuda.is_available() and "torch_cuda_random" in state:
+     41 +        torch.cuda.set_rng_state_all(state["torch_cuda_random"])
+     42 +
+     43 +
+     44 +def _serialize_config(config: object) -> dict[str, Any]:
+     45 +    if is_dataclass(config):
+     46 +        return asdict(config)
+     47 +    raise TypeError("config must be a dataclass instance")
+     48 +
+     49 +
+     50 +def save_checkpoint(
+     51 +    path: str | Path,
+     52 +    *,
+     53 +    model: Connect4Net,
+     54 +    optimizer: torch.optim.Optimizer,
+     55 +    scheduler: torch.optim.lr_scheduler.LRScheduler,
+     56 +    replay_buffer: ReplayBuffer,
+     57 +    iteration: int,
+     58 +    best_loss: float,
+     59 +    config: object,
+     60 +    rng: np.random.Generator,
+     61 +) -> Path:
+     62 +    path = Path(path)
+     63 +    path.parent.mkdir(parents=True, exist_ok=True)
+     64 +    payload = {
+     65 +        "model_state": model.state_dict(),
+     66 +        "model_config": model.config.to_dict(),
+     67 +        "optimizer_state": optimizer.state_dict(),
+     68 +        "scheduler_state": scheduler.state_dict(),
+     69 +        "replay_buffer": replay_buffer.state_dict(),
+     70 +        "iteration": iteration,
+     71 +        "best_loss": best_loss,
+     72 +        "training_config": _serialize_config(config),
+     73 +        "rng_state": capture_rng_state(rng),
+     74 +    }
+     75 +    torch.save(payload, path)
+     76 +    return path
+     77 +
+     78 +
+     79 +def load_checkpoint(
+     80 +    path: str | Path,
+     81 +    *,
+     82 +    device: torch.device,
+     83 +    model: Connect4Net | None = None,
+     84 +    optimizer: torch.optim.Optimizer | None = None,
+     85 +    scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
+     86 +    rng: np.random.Generator | None = None,
+     87 +) -> dict[str, Any]:
+     88 +    payload = torch.load(Path(path), map_location=device, weights_only=
+         False)
+     89 +    if model is not None:
+     90 +        model.load_state_dict(payload["model_state"])
+     91 +    if optimizer is not None:
+     92 +        optimizer.load_state_dict(payload["optimizer_state"])
+     93 +    if scheduler is not None:
+     94 +        scheduler.load_state_dict(payload["scheduler_state"])
+     95 +    if rng is not None:
+     96 +        restore_rng_state(payload["rng_state"], rng)
+     97 +    return payload
+     98 +
+     99 +
+    100 +def load_model_from_checkpoint(path: str | Path, device: torch.device)
+         -> Connect4Net:
+    101 +    payload = torch.load(Path(path), map_location=device, weights_only=
+         False)
+    102 +    model_config = NetworkConfig(**payload["model_config"])
+    103 +    model = Connect4Net(model_config).to(device)
+    104 +    model.load_state_dict(payload["model_state"])
+    105 +    model.eval()
+    106 +    return model
+
+  └ connect4_zero/game.py (+12 -4)
+     70
+     71 +def encode_board(board: np.ndarray, current_player: int) -> np.ndarray:
+     72 +    """Encode a board from the current player's perspective."""
+     73 +    checked = _validate_board(board)
+     74 +    if current_player not in (-1, 1):
+     75 +        raise ValueError(f"current_player must be -1 or 1, got {current
+         _player}")
+     76 +    current_plane = (checked == current_player).astype(np.float32)
+     77 +    opponent_plane = (checked == opponent(current_player)).astype(np.fl
+         oat32)
+     78 +    player_plane = np.full((ROWS, COLS), 1.0 if current_player == 1 els
+         e 0.0, dtype=np.float32)
+     79 +    return np.stack([current_plane, opponent_plane, player_plane], axis
+         =0)
+     80 +
+     81 +
+     82  @dataclass(frozen=True, slots=True)
+        ⋮
+    189          """Encode from the current player's perspective for the neural
+         net."""
+    179 -        current_plane = (self.board == self.current_player).astype(np.f
+         loat32)
+    180 -        opponent_plane = (self.board == opponent(self.current_player)).
+         astype(np.float32)
+    181 -        player_plane = np.full((ROWS, COLS), 1.0 if self.current_player
+          == 1 else 0.0, dtype=np.float32)
+    182 -        return np.stack([current_plane, opponent_plane, player_plane],
+         axis=0)
+    190 +        return encode_board(self.board, self.current_player)
+    191
+
+  └ connect4_zero/mcts.py (+193 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import math
+      4 +from dataclasses import dataclass
+      5 +from typing import Callable
+      6 +
+      7 +import numpy as np
+      8 +import torch
+      9 +
+     10 +from .game import COLS, GameState
+     11 +
+     12 +PolicyValueFn = Callable[[GameState], tuple[np.ndarray, float]]
+     13 +
+     14 +
+     15 +@dataclass(frozen=True, slots=True)
+     16 +class MCTSConfig:
+     17 +    simulations: int = 160
+     18 +    c_puct: float = 1.75
+     19 +    dirichlet_alpha: float = 0.3
+     20 +    dirichlet_epsilon: float = 0.25
+     21 +
+     22 +
+     23 +@dataclass(slots=True)
+     24 +class Node:
+     25 +    prior: float
+     26 +    visit_count: int = 0
+     27 +    value_sum: float = 0.0
+     28 +    children: dict[int, "Node"] | None = None
+     29 +
+     30 +    def expanded(self) -> bool:
+     31 +        return bool(self.children)
+     32 +
+     33 +    def value(self) -> float:
+     34 +        if self.visit_count == 0:
+     35 +            return 0.0
+     36 +        return self.value_sum / self.visit_count
+     37 +
+     38 +
+     39 +@dataclass(frozen=True, slots=True)
+     40 +class MCTSResult:
+     41 +    move: int
+     42 +    policy: np.ndarray
+     43 +    visit_counts: np.ndarray
+     44 +    root_value: float
+     45 +    root_visit_count: int
+     46 +
+     47 +    @property
+     48 +    def most_visited_move(self) -> int:
+     49 +        return int(np.argmax(self.visit_counts))
+     50 +
+     51 +    def top_actions(self, limit: int = 3) -> list[tuple[int, int, float
+         ]]:
+     52 +        pairs: list[tuple[int, int, float]] = []
+     53 +        for move in np.argsort(self.visit_counts)[::-1][:limit]:
+     54 +            visits = int(self.visit_counts[move])
+     55 +            if visits == 0:
+     56 +                continue
+     57 +            pairs.append((int(move), visits, float(self.policy[move])))
+     58 +        return pairs
+     59 +
+     60 +
+     61 +def _masked_softmax(logits: np.ndarray, legal_moves: tuple[int, ...]) -
+         > np.ndarray:
+     62 +    masked = np.full(COLS, -1e9, dtype=np.float32)
+     63 +    masked[list(legal_moves)] = logits[list(legal_moves)]
+     64 +    max_logit = float(np.max(masked[list(legal_moves)]))
+     65 +    exps = np.zeros(COLS, dtype=np.float32)
+     66 +    exps[list(legal_moves)] = np.exp(masked[list(legal_moves)] - max_lo
+         git)
+     67 +    total = float(exps.sum())
+     68 +    if total <= 0.0:
+     69 +        exps[list(legal_moves)] = 1.0 / len(legal_moves)
+     70 +        return exps
+     71 +    return exps / total
+     72 +
+     73 +
+     74 +class NeuralNetEvaluator:
+     75 +    def __init__(self, model: torch.nn.Module, device: torch.device) ->
+          None:
+     76 +        self.model = model
+     77 +        self.device = device
+     78 +
+     79 +    def __call__(self, state: GameState) -> tuple[np.ndarray, float]:
+     80 +        self.model.eval()
+     81 +        with torch.no_grad():
+     82 +            encoded = torch.from_numpy(state.encode()).unsqueeze(0).to(
+         self.device)
+     83 +            logits, value = self.model(encoded)
+     84 +        return logits.squeeze(0).detach().cpu().numpy().astype(np.float
+         32), float(value.item())
+     85 +
+     86 +
+     87 +class MCTS:
+     88 +    def __init__(self, policy_value_fn: PolicyValueFn, config: MCTSConf
+         ig | None = None) -> None:
+     89 +        self.policy_value_fn = policy_value_fn
+     90 +        self.config = config or MCTSConfig()
+     91 +
+     92 +    def _expand(self, node: Node, state: GameState) -> float:
+     93 +        legal_moves = state.legal_moves()
+     94 +        logits, value = self.policy_value_fn(state)
+     95 +        priors = _masked_softmax(np.asarray(logits, dtype=np.float32),
+         legal_moves)
+     96 +        node.children = {move: Node(prior=float(priors[move])) for move
+          in legal_moves}
+     97 +        return float(value)
+     98 +
+     99 +    def _add_root_noise(self, root: Node, rng: np.random.Generator) ->
+         None:
+    100 +        if not root.children:
+    101 +            return
+    102 +        moves = tuple(root.children)
+    103 +        noise = rng.dirichlet([self.config.dirichlet_alpha] * len(moves
+         ))
+    104 +        for move, sampled_noise in zip(moves, noise):
+    105 +            child = root.children[move]
+    106 +            child.prior = (1.0 - self.config.dirichlet_epsilon) * child
+         .prior + self.config.dirichlet_epsilon * float(sampled_noise)
+    107 +
+    108 +    def _select_child(self, parent: Node) -> tuple[int, Node]:
+    109 +        assert parent.children is not None
+    110 +        best_score = -float("inf")
+    111 +        best_move = -1
+    112 +        best_child: Node | None = None
+    113 +        sqrt_visits = math.sqrt(max(1, parent.visit_count))
+    114 +        for move, child in parent.children.items():
+    115 +            q_value = -child.value()
+    116 +            u_value = self.config.c_puct * child.prior * sqrt_visits /
+         (1 + child.visit_count)
+    117 +            score = q_value + u_value
+    118 +            if score > best_score:
+    119 +                best_score = score
+    120 +                best_move = move
+    121 +                best_child = child
+    122 +        assert best_child is not None
+    123 +        return best_move, best_child
+    124 +
+    125 +    @staticmethod
+    126 +    def _backpropagate(search_path: list[Node], value: float) -> None:
+    127 +        for node in reversed(search_path):
+    128 +            node.visit_count += 1
+    129 +            node.value_sum += value
+    130 +            value = -value
+    131 +
+    132 +    @staticmethod
+    133 +    def _policy_from_visits(visit_counts: np.ndarray, temperature: floa
+         t) -> np.ndarray:
+    134 +        counts = visit_counts.astype(np.float64)
+    135 +        if counts.sum() == 0:
+    136 +            raise ValueError("visit counts must contain at least one vi
+         sit")
+    137 +        if temperature <= 1e-6:
+    138 +            policy = np.zeros_like(counts, dtype=np.float32)
+    139 +            policy[int(np.argmax(counts))] = 1.0
+    140 +            return policy
+    141 +        counts = np.power(counts, 1.0 / temperature)
+    142 +        counts /= counts.sum()
+    143 +        return counts.astype(np.float32)
+    144 +
+    145 +    def run(
+    146 +        self,
+    147 +        state: GameState,
+    148 +        *,
+    149 +        add_root_noise: bool = False,
+    150 +        temperature: float = 0.0,
+    151 +        rng: np.random.Generator | None = None,
+    152 +    ) -> MCTSResult:
+    153 +        if state.is_terminal:
+    154 +            raise ValueError("cannot run MCTS on a terminal state")
+    155 +        rng = rng or np.random.default_rng()
+    156 +        root = Node(prior=1.0)
+    157 +        root_value = self._expand(root, state)
+    158 +        if add_root_noise:
+    159 +            self._add_root_noise(root, rng)
+    160 +        self._backpropagate([root], root_value)
+    161 +
+    162 +        for _ in range(max(0, self.config.simulations - 1)):
+    163 +            scratch_state = state
+    164 +            node = root
+    165 +            search_path = [root]
+    166 +
+    167 +            while node.expanded() and not scratch_state.is_terminal:
+    168 +                move, node = self._select_child(node)
+    169 +                scratch_state = scratch_state.apply_move(move)
+    170 +                search_path.append(node)
+    171 +
+    172 +            if scratch_state.is_terminal:
+    173 +                value = scratch_state.result_for_player(scratch_state.c
+         urrent_player)
+    174 +            else:
+    175 +                value = self._expand(node, scratch_state)
+    176 +            self._backpropagate(search_path, float(value))
+    177 +
+    178 +        visit_counts = np.zeros(COLS, dtype=np.float32)
+    179 +        if root.children:
+    180 +            for move, child in root.children.items():
+    181 +                visit_counts[move] = child.visit_count
+    182 +        policy = self._policy_from_visits(visit_counts, temperature)
+    183 +        if temperature <= 1e-6:
+    184 +            move = int(np.argmax(policy))
+    185 +        else:
+    186 +            move = int(rng.choice(np.arange(COLS), p=policy))
+    187 +        return MCTSResult(
+    188 +            move=move,
+    189 +            policy=policy,
+    190 +            visit_counts=visit_counts,
+    191 +            root_value=root.value(),
+    192 +            root_visit_count=root.visit_count,
+    193 +        )
+
+  └ connect4_zero/model.py (+83 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +from dataclasses import asdict, dataclass
+     4 +
+     5 +import torch
+     6 +from torch import nn
+     7 +
+     8 +from .game import COLS, ROWS
+     9 +
+    10 +
+    11 +@dataclass(frozen=True, slots=True)
+    12 +class NetworkConfig:
+    13 +    channels: int = 64
+    14 +    residual_blocks: int = 6
+    15 +    value_hidden: int = 128
+    16 +
+    17 +    def to_dict(self) -> dict[str, int]:
+    18 +        return asdict(self)
+    19 +
+    20 +
+    21 +class ResidualBlock(nn.Module):
+    22 +    def __init__(self, channels: int) -> None:
+    23 +        super().__init__()
+    24 +        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, paddin
+        g=1, bias=False)
+    25 +        self.bn1 = nn.BatchNorm2d(channels)
+    26 +        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, paddin
+        g=1, bias=False)
+    27 +        self.bn2 = nn.BatchNorm2d(channels)
+    28 +        self.relu = nn.ReLU(inplace=True)
+    29 +
+    30 +    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    31 +        residual = x
+    32 +        x = self.relu(self.bn1(self.conv1(x)))
+    33 +        x = self.bn2(self.conv2(x))
+    34 +        x = x + residual
+    35 +        return self.relu(x)
+    36 +
+    37 +
+    38 +class Connect4Net(nn.Module):
+    39 +    def __init__(self, config: NetworkConfig | None = None) -> None:
+    40 +        super().__init__()
+    41 +        self.config = config or NetworkConfig()
+    42 +        channels = self.config.channels
+    43 +
+    44 +        self.stem = nn.Sequential(
+    45 +            nn.Conv2d(3, channels, kernel_size=3, padding=1, bias=False)
+        ,
+    46 +            nn.BatchNorm2d(channels),
+    47 +            nn.ReLU(inplace=True),
+    48 +        )
+    49 +        self.body = nn.Sequential(*[ResidualBlock(channels) for _ in ran
+        ge(self.config.residual_blocks)])
+    50 +
+    51 +        self.policy_head = nn.Sequential(
+    52 +            nn.Conv2d(channels, 32, kernel_size=1, bias=False),
+    53 +            nn.BatchNorm2d(32),
+    54 +            nn.ReLU(inplace=True),
+    55 +        )
+    56 +        self.policy_linear = nn.Linear(32 * ROWS * COLS, COLS)
+    57 +
+    58 +        self.value_head = nn.Sequential(
+    59 +            nn.Conv2d(channels, 16, kernel_size=1, bias=False),
+    60 +            nn.BatchNorm2d(16),
+    61 +            nn.ReLU(inplace=True),
+    62 +        )
+    63 +        self.value_hidden = nn.Linear(16 * ROWS * COLS, self.config.valu
+        e_hidden)
+    64 +        self.value_out = nn.Linear(self.config.value_hidden, 1)
+    65 +        self.relu = nn.ReLU(inplace=True)
+    66 +        self.tanh = nn.Tanh()
+    67 +
+    68 +    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tens
+        or]:
+    69 +        features = self.body(self.stem(x))
+    70 +
+    71 +        policy = self.policy_head(features)
+    72 +        policy = self.policy_linear(policy.flatten(start_dim=1))
+    73 +
+    74 +        value = self.value_head(features)
+    75 +        value = self.relu(self.value_hidden(value.flatten(start_dim=1)))
+    76 +        value = self.tanh(self.value_out(value))
+    77 +        return policy, value.squeeze(1)
+    78 +
+    79 +
+    80 +def make_device(prefer_cuda: bool = True) -> torch.device:
+    81 +    if prefer_cuda and torch.cuda.is_available():
+    82 +        return torch.device("cuda")
+    83 +    return torch.device("cpu")
+
+  └ connect4_zero/player_entry.py (+55 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +import os
+     4 +from pathlib import Path
+     5 +
+     6 +from .checkpoint import load_model_from_checkpoint
+     7 +from .game import GameState, apply_move_string
+     8 +from .mcts import MCTS, MCTSConfig, NeuralNetEvaluator
+     9 +from .model import make_device
+    10 +
+    11 +
+    12 +def read_game_state(path: str | Path) -> GameState:
+    13 +    move_path = Path(path)
+    14 +    if not move_path.exists():
+    15 +        return GameState.initial()
+    16 +    contents = move_path.read_text(encoding="utf-8").strip()
+    17 +    if not contents:
+    18 +        return GameState.initial()
+    19 +    return apply_move_string(GameState.initial(), contents)
+    20 +
+    21 +
+    22 +def select_next_move(
+    23 +    state: GameState,
+    24 +    *,
+    25 +    checkpoint_path: str | Path,
+    26 +    simulations: int,
+    27 +    prefer_cuda: bool = True,
+    28 +) -> str:
+    29 +    if state.is_terminal:
+    30 +        return "DRAW" if state.is_draw else "LOSS"
+    31 +    device = make_device(prefer_cuda=prefer_cuda)
+    32 +    model = load_model_from_checkpoint(checkpoint_path, device)
+    33 +    evaluator = NeuralNetEvaluator(model, device)
+    34 +    search = MCTS(evaluator, MCTSConfig(simulations=simulations))
+    35 +    result = search.run(state, temperature=0.0)
+    36 +    if not state.is_legal_move(result.move):
+    37 +        legal_moves = state.legal_moves()
+    38 +        if not legal_moves:
+    39 +            return "DRAW"
+    40 +        return str(legal_moves[0] + 1)
+    41 +    return str(result.move + 1)
+    42 +
+    43 +
+    44 +def main() -> None:
+    45 +    game_state_path = Path("game_state.txt")
+    46 +    output_path = Path("next_move.txt")
+    47 +    checkpoint_path = Path(os.environ.get("CONNECT4_MODEL_PATH", "artifa
+        cts/best.pt"))
+    48 +    simulations = int(os.environ.get("CONNECT4_PLAYER_SIMULATIONS", "320
+        "))
+    49 +    state = read_game_state(game_state_path)
+    50 +    move = select_next_move(state, checkpoint_path=checkpoint_path, simu
+        lations=simulations)
+    51 +    output_path.write_text(move, encoding="utf-8")
+    52 +
+    53 +
+    54 +if __name__ == "__main__":
+    55 +    main()
+
+  └ connect4_zero/replay.py (+106 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +from collections import deque
+      4 +from dataclasses import dataclass
+      5 +from typing import Iterable
+      6 +
+      7 +import numpy as np
+      8 +
+      9 +from .game import COLS, encode_board
+     10 +
+     11 +
+     12 +@dataclass(frozen=True, slots=True)
+     13 +class ReplayExample:
+     14 +    board: np.ndarray
+     15 +    current_player: int
+     16 +    policy: np.ndarray
+     17 +    outcome: float
+     18 +
+     19 +    def __post_init__(self) -> None:
+     20 +        board = np.asarray(self.board, dtype=np.int8)
+     21 +        policy = np.asarray(self.policy, dtype=np.float32)
+     22 +        if policy.shape != (COLS,):
+     23 +            raise ValueError(f"policy must have shape {(COLS,)}, got {p
+         olicy.shape}")
+     24 +        if not np.isclose(policy.sum(), 1.0, atol=1e-4):
+     25 +            raise ValueError(f"policy must sum to 1, got {policy.sum()}
+         ")
+     26 +        object.__setattr__(self, "board", board.copy())
+     27 +        object.__setattr__(self, "policy", policy.copy())
+     28 +
+     29 +    def encode(self) -> np.ndarray:
+     30 +        return encode_board(self.board, self.current_player)
+     31 +
+     32 +    def mirrored(self) -> "ReplayExample":
+     33 +        return ReplayExample(
+     34 +            board=np.flip(self.board, axis=1).copy(),
+     35 +            current_player=self.current_player,
+     36 +            policy=np.flip(self.policy).copy(),
+     37 +            outcome=self.outcome,
+     38 +        )
+     39 +
+     40 +    def to_dict(self) -> dict[str, np.ndarray | float | int]:
+     41 +        return {
+     42 +            "board": self.board.copy(),
+     43 +            "current_player": self.current_player,
+     44 +            "policy": self.policy.copy(),
+     45 +            "outcome": float(self.outcome),
+     46 +        }
+     47 +
+     48 +    @classmethod
+     49 +    def from_dict(cls, payload: dict[str, np.ndarray | float | int]) ->
+          "ReplayExample":
+     50 +        return cls(
+     51 +            board=np.asarray(payload["board"], dtype=np.int8),
+     52 +            current_player=int(payload["current_player"]),
+     53 +            policy=np.asarray(payload["policy"], dtype=np.float32),
+     54 +            outcome=float(payload["outcome"]),
+     55 +        )
+     56 +
+     57 +
+     58 +class ReplayBuffer:
+     59 +    def __init__(self, capacity: int) -> None:
+     60 +        if capacity <= 0:
+     61 +            raise ValueError("capacity must be positive")
+     62 +        self.capacity = capacity
+     63 +        self.examples: deque[ReplayExample] = deque(maxlen=capacity)
+     64 +        self.total_added = 0
+     65 +
+     66 +    def __len__(self) -> int:
+     67 +        return len(self.examples)
+     68 +
+     69 +    def add(self, example: ReplayExample) -> None:
+     70 +        self.examples.append(example)
+     71 +        self.total_added += 1
+     72 +
+     73 +    def extend(self, examples: Iterable[ReplayExample]) -> None:
+     74 +        for example in examples:
+     75 +            self.add(example)
+     76 +
+     77 +    def sample(self, batch_size: int, rng: np.random.Generator) -> dict
+         [str, np.ndarray]:
+     78 +        if len(self.examples) == 0:
+     79 +            raise ValueError("cannot sample from an empty replay buffer
+         ")
+     80 +        if batch_size <= 0:
+     81 +            raise ValueError("batch_size must be positive")
+     82 +        replace = len(self.examples) < batch_size
+     83 +        indices = rng.choice(len(self.examples), size=batch_size, repla
+         ce=replace)
+     84 +        boards = np.stack([self.examples[int(index)].encode() for index
+          in indices], axis=0)
+     85 +        policies = np.stack([self.examples[int(index)].policy for index
+          in indices], axis=0)
+     86 +        outcomes = np.array([self.examples[int(index)].outcome for inde
+         x in indices], dtype=np.float32)
+     87 +        return {"boards": boards, "policies": policies, "outcomes": out
+         comes}
+     88 +
+     89 +    def turnover_rate(self) -> float:
+     90 +        if self.total_added <= self.capacity:
+     91 +            return 0.0
+     92 +        return (self.total_added - len(self.examples)) / max(1, self.to
+         tal_added)
+     93 +
+     94 +    def state_dict(self) -> dict[str, object]:
+     95 +        return {
+     96 +            "capacity": self.capacity,
+     97 +            "total_added": self.total_added,
+     98 +            "examples": [example.to_dict() for example in self.examples
+         ],
+     99 +        }
+    100 +
+    101 +    @classmethod
+    102 +    def from_state_dict(cls, payload: dict[str, object]) -> "ReplayBuff
+         er":
+    103 +        buffer = cls(capacity=int(payload["capacity"]))
+    104 +        buffer.total_added = int(payload["total_added"])
+    105 +        buffer.examples.extend(ReplayExample.from_dict(example) for exa
+         mple in payload["examples"])
+    106 +        return buffer
+
+  └ connect4_zero/training.py (+367 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import csv
+      4 +import signal
+      5 +import time
+      6 +from collections import Counter
+      7 +from dataclasses import asdict, dataclass
+      8 +from datetime import datetime, timezone
+      9 +from pathlib import Path
+     10 +from typing import Any
+     11 +
+     12 +import numpy as np
+     13 +import torch
+     14 +import torch.nn.functional as F
+     15 +
+     16 +from .checkpoint import load_checkpoint, save_checkpoint
+     17 +from .game import GameState
+     18 +from .mcts import MCTS, MCTSConfig, MCTSResult, NeuralNetEvaluator
+     19 +from .model import Connect4Net, NetworkConfig, make_device
+     20 +from .replay import ReplayBuffer, ReplayExample
+     21 +
+     22 +
+     23 +@dataclass(frozen=True, slots=True)
+     24 +class TrainingConfig:
+     25 +    iterations: int = 12
+     26 +    self_play_games_per_iteration: int = 16
+     27 +    training_batches_per_iteration: int = 32
+     28 +    batch_size: int = 128
+     29 +    replay_buffer_capacity: int = 50_000
+     30 +    learning_rate: float = 1e-3
+     31 +    weight_decay: float = 1e-4
+     32 +    scheduler_step_size: int = 20
+     33 +    scheduler_gamma: float = 0.5
+     34 +    seed: int = 1234
+     35 +    model_channels: int = 64
+     36 +    model_blocks: int = 6
+     37 +    model_value_hidden: int = 128
+     38 +    mcts_simulations: int = 160
+     39 +    evaluation_simulations: int = 320
+     40 +    c_puct: float = 1.75
+     41 +    dirichlet_alpha: float = 0.3
+     42 +    dirichlet_epsilon: float = 0.25
+     43 +    temperature_moves: int = 10
+     44 +    checkpoint_every: int = 1
+     45 +    grad_clip_norm: float = 1.0
+     46 +
+     47 +    def model_config(self) -> NetworkConfig:
+     48 +        return NetworkConfig(
+     49 +            channels=self.model_channels,
+     50 +            residual_blocks=self.model_blocks,
+     51 +            value_hidden=self.model_value_hidden,
+     52 +        )
+     53 +
+     54 +    def mcts_config(self, simulations: int | None = None) -> MCTSConfig
+         :
+     55 +        return MCTSConfig(
+     56 +            simulations=simulations or self.mcts_simulations,
+     57 +            c_puct=self.c_puct,
+     58 +            dirichlet_alpha=self.dirichlet_alpha,
+     59 +            dirichlet_epsilon=self.dirichlet_epsilon,
+     60 +        )
+     61 +
+     62 +
+     63 +@dataclass(frozen=True, slots=True)
+     64 +class SelfPlaySummary:
+     65 +    x_win_rate: float
+     66 +    o_win_rate: float
+     67 +    draw_rate: float
+     68 +    average_game_length: float
+     69 +    replay_buffer_size: int
+     70 +    replay_turnover_rate: float
+     71 +    modal_root_move: int
+     72 +    average_root_visit_count: float
+     73 +    average_root_value: float
+     74 +
+     75 +
+     76 +@dataclass(frozen=True, slots=True)
+     77 +class TrainingMetrics:
+     78 +    total_loss: float
+     79 +    policy_loss: float
+     80 +    value_loss: float
+     81 +    learning_rate: float
+     82 +
+     83 +
+     84 +@dataclass(frozen=True, slots=True)
+     85 +class SelfPlayGameResult:
+     86 +    final_state: GameState
+     87 +    examples: list[ReplayExample]
+     88 +    opening_result: MCTSResult
+     89 +
+     90 +
+     91 +class Trainer:
+     92 +    def __init__(
+     93 +        self,
+     94 +        config: TrainingConfig,
+     95 +        *,
+     96 +        device: torch.device | None = None,
+     97 +        output_dir: str | Path = "artifacts",
+     98 +    ) -> None:
+     99 +        self.config = config
+    100 +        self.device = device or make_device()
+    101 +        self.output_dir = Path(output_dir)
+    102 +        self.output_dir.mkdir(parents=True, exist_ok=True)
+    103 +        self.checkpoint_dir = self.output_dir / "checkpoints"
+    104 +        self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    105 +
+    106 +        self.model = Connect4Net(config.model_config()).to(self.device)
+    107 +        self.optimizer = torch.optim.AdamW(
+    108 +            self.model.parameters(),
+    109 +            lr=config.learning_rate,
+    110 +            weight_decay=config.weight_decay,
+    111 +        )
+    112 +        self.scheduler = torch.optim.lr_scheduler.StepLR(
+    113 +            self.optimizer,
+    114 +            step_size=config.scheduler_step_size,
+    115 +            gamma=config.scheduler_gamma,
+    116 +        )
+    117 +        self.replay_buffer = ReplayBuffer(config.replay_buffer_capacity
+         )
+    118 +        self.rng = np.random.default_rng(config.seed)
+    119 +        self.iteration = 0
+    120 +        self.best_loss = float("inf")
+    121 +        self.shutdown_requested = False
+    122 +
+    123 +    def request_shutdown(self, *_: Any) -> None:
+    124 +        self.shutdown_requested = True
+    125 +        print("SIGINT received. The current phase will finish, then a c
+         heckpoint will be saved.")
+    126 +
+    127 +    def install_signal_handler(self) -> None:
+    128 +        signal.signal(signal.SIGINT, self.request_shutdown)
+    129 +
+    130 +    def state_dict(self) -> dict[str, Any]:
+    131 +        return {
+    132 +            "iteration": self.iteration,
+    133 +            "best_loss": self.best_loss,
+    134 +            "config": asdict(self.config),
+    135 +        }
+    136 +
+    137 +    def save(self, name: str = "latest.pt") -> Path:
+    138 +        return save_checkpoint(
+    139 +            self.checkpoint_dir / name,
+    140 +            model=self.model,
+    141 +            optimizer=self.optimizer,
+    142 +            scheduler=self.scheduler,
+    143 +            replay_buffer=self.replay_buffer,
+    144 +            iteration=self.iteration,
+    145 +            best_loss=self.best_loss,
+    146 +            config=self.config,
+    147 +            rng=self.rng,
+    148 +        )
+    149 +
+    150 +    def save_best(self) -> Path:
+    151 +        return save_checkpoint(
+    152 +            self.output_dir / "best.pt",
+    153 +            model=self.model,
+    154 +            optimizer=self.optimizer,
+    155 +            scheduler=self.scheduler,
+    156 +            replay_buffer=self.replay_buffer,
+    157 +            iteration=self.iteration,
+    158 +            best_loss=self.best_loss,
+    159 +            config=self.config,
+    160 +            rng=self.rng,
+    161 +        )
+    162 +
+    163 +    def load(self, checkpoint_path: str | Path) -> None:
+    164 +        payload = load_checkpoint(
+    165 +            checkpoint_path,
+    166 +            device=self.device,
+    167 +            model=self.model,
+    168 +            optimizer=self.optimizer,
+    169 +            scheduler=self.scheduler,
+    170 +            rng=self.rng,
+    171 +        )
+    172 +        self.replay_buffer = ReplayBuffer.from_state_dict(payload["repl
+         ay_buffer"])
+    173 +        self.iteration = int(payload["iteration"])
+    174 +        self.best_loss = float(payload["best_loss"])
+    175 +
+    176 +    def _self_play_game(self) -> SelfPlayGameResult:
+    177 +        evaluator = NeuralNetEvaluator(self.model, self.device)
+    178 +        mcts = MCTS(evaluator, self.config.mcts_config())
+    179 +        state = GameState.initial()
+    180 +        trajectory: list[tuple[np.ndarray, int, np.ndarray]] = []
+    181 +        opening_result: MCTSResult | None = None
+    182 +
+    183 +        while not state.is_terminal:
+    184 +            temperature = 1.0 if state.move_count < self.config.tempera
+         ture_moves else 0.0
+    185 +            result = mcts.run(
+    186 +                state,
+    187 +                add_root_noise=True,
+    188 +                temperature=temperature,
+    189 +                rng=self.rng,
+    190 +            )
+    191 +            if opening_result is None:
+    192 +                opening_result = result
+    193 +            trajectory.append((state.board.copy(), state.current_player
+         , result.policy.copy()))
+    194 +            state = state.apply_move(result.move)
+    195 +
+    196 +        assert opening_result is not None
+    197 +        examples: list[ReplayExample] = []
+    198 +        for board, current_player, policy in trajectory:
+    199 +            outcome = state.result_for_player(current_player)
+    200 +            example = ReplayExample(board=board, current_player=current
+         _player, policy=policy, outcome=outcome)
+    201 +            examples.append(example)
+    202 +            examples.append(example.mirrored())
+    203 +        return SelfPlayGameResult(final_state=state, examples=examples,
+          opening_result=opening_result)
+    204 +
+    205 +    def self_play_phase(self) -> SelfPlaySummary:
+    206 +        wins = Counter()
+    207 +        lengths: list[int] = []
+    208 +        opening_results: list[MCTSResult] = []
+    209 +
+    210 +        for _ in range(self.config.self_play_games_per_iteration):
+    211 +            result = self._self_play_game()
+    212 +            self.replay_buffer.extend(result.examples)
+    213 +            lengths.append(result.final_state.move_count)
+    214 +            opening_results.append(result.opening_result)
+    215 +            if result.final_state.is_draw:
+    216 +                wins["draw"] += 1
+    217 +            elif result.final_state.winner == 1:
+    218 +                wins["x"] += 1
+    219 +            else:
+    220 +                wins["o"] += 1
+    221 +
+    222 +        move_counts = Counter(result.most_visited_move for result in op
+         ening_results)
+    223 +        modal_root_move = min(move for move, count in move_counts.items
+         () if count == max(move_counts.values()))
+    224 +        return SelfPlaySummary(
+    225 +            x_win_rate=wins["x"] / self.config.self_play_games_per_iter
+         ation,
+    226 +            o_win_rate=wins["o"] / self.config.self_play_games_per_iter
+         ation,
+    227 +            draw_rate=wins["draw"] / self.config.self_play_games_per_it
+         eration,
+    228 +            average_game_length=float(np.mean(lengths)),
+    229 +            replay_buffer_size=len(self.replay_buffer),
+    230 +            replay_turnover_rate=self.replay_buffer.turnover_rate(),
+    231 +            modal_root_move=modal_root_move,
+    232 +            average_root_visit_count=float(np.mean([result.root_visit_c
+         ount for result in opening_results])),
+    233 +            average_root_value=float(np.mean([result.root_value for res
+         ult in opening_results])),
+    234 +        )
+    235 +
+    236 +    def train_phase(self) -> TrainingMetrics:
+    237 +        if len(self.replay_buffer) == 0:
+    238 +            raise ValueError("replay buffer is empty; run self-play bef
+         ore training")
+    239 +        self.model.train()
+    240 +        total_loss_sum = 0.0
+    241 +        policy_loss_sum = 0.0
+    242 +        value_loss_sum = 0.0
+    243 +
+    244 +        for _ in range(self.config.training_batches_per_iteration):
+    245 +            batch = self.replay_buffer.sample(self.config.batch_size, s
+         elf.rng)
+    246 +            boards = torch.from_numpy(batch["boards"]).to(self.device)
+    247 +            policies = torch.from_numpy(batch["policies"]).to(self.devi
+         ce)
+    248 +            outcomes = torch.from_numpy(batch["outcomes"]).to(self.devi
+         ce)
+    249 +
+    250 +            logits, predicted_values = self.model(boards)
+    251 +            policy_loss = -(policies * F.log_softmax(logits, dim=1)).su
+         m(dim=1).mean()
+    252 +            value_loss = F.mse_loss(predicted_values, outcomes)
+    253 +            total_loss = policy_loss + value_loss
+    254 +
+    255 +            self.optimizer.zero_grad(set_to_none=True)
+    256 +            total_loss.backward()
+    257 +            torch.nn.utils.clip_grad_norm_(self.model.parameters(), sel
+         f.config.grad_clip_norm)
+    258 +            self.optimizer.step()
+    259 +
+    260 +            total_loss_sum += float(total_loss.item())
+    261 +            policy_loss_sum += float(policy_loss.item())
+    262 +            value_loss_sum += float(value_loss.item())
+    263 +
+    264 +        self.scheduler.step()
+    265 +        scale = float(self.config.training_batches_per_iteration)
+    266 +        return TrainingMetrics(
+    267 +            total_loss=total_loss_sum / scale,
+    268 +            policy_loss=policy_loss_sum / scale,
+    269 +            value_loss=value_loss_sum / scale,
+    270 +            learning_rate=float(self.optimizer.param_groups[0]["lr"]),
+    271 +        )
+    272 +
+    273 +
+    274 +def append_training_log(path: str | Path, *, iteration: int, self_play:
+          SelfPlaySummary, metrics: TrainingMetrics) -> None:
+    275 +    path = Path(path)
+    276 +    path.parent.mkdir(parents=True, exist_ok=True)
+    277 +    row = {
+    278 +        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+    279 +        "iteration": iteration,
+    280 +        "total_loss": metrics.total_loss,
+    281 +        "policy_loss": metrics.policy_loss,
+    282 +        "value_loss": metrics.value_loss,
+    283 +        "learning_rate": metrics.learning_rate,
+    284 +        "root_most_visited_column": self_play.modal_root_move + 1,
+    285 +        "root_visit_count": self_play.average_root_visit_count,
+    286 +        "root_value": self_play.average_root_value,
+    287 +        "x_win_rate": self_play.x_win_rate,
+    288 +        "o_win_rate": self_play.o_win_rate,
+    289 +        "draw_rate": self_play.draw_rate,
+    290 +        "average_game_length": self_play.average_game_length,
+    291 +        "replay_buffer_size": self_play.replay_buffer_size,
+    292 +        "replay_turnover_rate": self_play.replay_turnover_rate,
+    293 +    }
+    294 +    file_exists = path.exists()
+    295 +    with path.open("a", newline="", encoding="utf-8") as handle:
+    296 +        writer = csv.DictWriter(handle, fieldnames=list(row))
+    297 +        if not file_exists:
+    298 +            writer.writeheader()
+    299 +        writer.writerow(row)
+    300 +
+    301 +
+    302 +def log_self_play_summary(iteration: int, summary: SelfPlaySummary) ->
+         None:
+    303 +    print(
+    304 +        f"[iteration {iteration}] self-play summary | "
+    305 +        f"X win rate: {summary.x_win_rate:.3f} | "
+    306 +        f"O win rate: {summary.o_win_rate:.3f} | "
+    307 +        f"draw rate: {summary.draw_rate:.3f} | "
+    308 +        f"avg length: {summary.average_game_length:.2f} | "
+    309 +        f"replay: {summary.replay_buffer_size} | "
+    310 +        f"turnover: {summary.replay_turnover_rate:.3f}"
+    311 +    )
+    312 +
+    313 +
+    314 +def log_training_metrics(iteration: int, summary: SelfPlaySummary, metr
+         ics: TrainingMetrics) -> None:
+    315 +    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S
+         UTC")
+    316 +    print(
+    317 +        f"[iteration {iteration}] {timestamp} | "
+    318 +        f"loss: {metrics.total_loss:.4f} | "
+    319 +        f"policy: {metrics.policy_loss:.4f} | "
+    320 +        f"value: {metrics.value_loss:.4f} | "
+    321 +        f"lr: {metrics.learning_rate:.6f} | "
+    322 +        f"root move: {summary.modal_root_move + 1} | "
+    323 +        f"root visits: {summary.average_root_visit_count:.1f} | "
+    324 +        f"root value: {summary.average_root_value:.3f}"
+    325 +    )
+    326 +
+    327 +
+    328 +def run_training(
+    329 +    config: TrainingConfig,
+    330 +    *,
+    331 +    output_dir: str | Path = "artifacts",
+    332 +    resume_from: str | Path | None = None,
+    333 +    prefer_cuda: bool = True,
+    334 +) -> Trainer:
+    335 +    trainer = Trainer(config, device=make_device(prefer_cuda=prefer_cud
+         a), output_dir=output_dir)
+    336 +    trainer.install_signal_handler()
+    337 +    if resume_from:
+    338 +        trainer.load(resume_from)
+    339 +        print(f"Resumed from checkpoint: {resume_from}")
+    340 +
+    341 +    csv_path = Path(output_dir) / "training_log.csv"
+    342 +    for iteration in range(trainer.iteration + 1, config.iterations + 1
+         ):
+    343 +        trainer.iteration = iteration
+    344 +        self_play_summary = trainer.self_play_phase()
+    345 +        log_self_play_summary(iteration, self_play_summary)
+    346 +        if trainer.shutdown_requested:
+    347 +            trainer.save("latest.pt")
+    348 +            print(f"Checkpoint saved after self-play for iteration {ite
+         ration}. Exiting.")
+    349 +            break
+    350 +
+    351 +        print(f"[iteration {iteration}] training network")
+    352 +        metrics = trainer.train_phase()
+    353 +        append_training_log(csv_path, iteration=iteration, self_play=se
+         lf_play_summary, metrics=metrics)
+    354 +        log_training_metrics(iteration, self_play_summary, metrics)
+    355 +
+    356 +        trainer.save("latest.pt")
+    357 +        if iteration % config.checkpoint_every == 0:
+    358 +            trainer.save(f"iter_{iteration:04d}.pt")
+    359 +        if metrics.total_loss <= trainer.best_loss:
+    360 +            trainer.best_loss = metrics.total_loss
+    361 +            trainer.save_best()
+    362 +
+    363 +        if trainer.shutdown_requested:
+    364 +            trainer.save("latest.pt")
+    365 +            print(f"Checkpoint saved after training for iteration {iter
+         ation}. Exiting.")
+    366 +            break
+    367 +    return trainer
+
+─ Worked for 2m 13s ────────────────────────────────────────────────────────────
+
+• The training stack is written; I’m wiring the CLI and evaluation entrypoint
+  now, then I’ll put the second wave of tests over model/replay/MCTS/checkpoint/
+  player behavior before running them.
+
+• Edited 8 files (+400 -0)
+  └ connect4_zero/cli.py (+116 -0)
+      3  import argparse
+      4 +from pathlib import Path
+      5
+      6 +from .checkpoint import load_model_from_checkpoint
+      7  from .game import COLS, GameState
+      8 +from .mcts import MCTS, MCTSConfig, NeuralNetEvaluator
+      9 +from .model import make_device
+     10 +from .training import TrainingConfig, run_training
+     11
+        ⋮
+     39
+     40 +def play_human_vs_model(checkpoint_path: str | Path, *, human_first: bo
+         ol, simulations: int, prefer_cuda: bool) -> None:
+     41 +    device = make_device(prefer_cuda=prefer_cuda)
+     42 +    model = load_model_from_checkpoint(checkpoint_path, device)
+     43 +    evaluator = NeuralNetEvaluator(model, device)
+     44 +    search = MCTS(evaluator, MCTSConfig(simulations=simulations))
+     45 +
+     46 +    human_player = 1 if human_first else -1
+     47 +    state = GameState.initial()
+     48 +    print(state.pretty())
+     49 +
+     50 +    while not state.is_terminal:
+     51 +        if state.current_player == human_player:
+     52 +            move = _read_human_move(state)
+     53 +            state = state.apply_move(move)
+     54 +            print()
+     55 +            print(state.pretty())
+     56 +            continue
+     57 +
+     58 +        result = search.run(state, temperature=0.0)
+     59 +        print()
+     60 +        print("Model search:")
+     61 +        for move, visits, probability in result.top_actions(limit=3):
+     62 +            print(f"  column {move + 1}: {visits} visits, policy {proba
+         bility:.3f}")
+     63 +        print(f"  root win probability: {(result.root_value + 1.0) / 2.
+         0:.3f}")
+     64 +        print(f"Model chooses column {result.move + 1}.")
+     65 +        state = state.apply_move(result.move)
+     66 +        print()
+     67 +        print(state.pretty())
+     68 +
+     69 +    print()
+     70 +    if state.is_draw:
+     71 +        print("Game over: draw.")
+     72 +    else:
+     73 +        winner = "human" if state.winner == human_player else "model"
+     74 +        print(f"Game over: {winner} wins.")
+     75 +
+     76 +
+     77  def build_parser() -> argparse.ArgumentParser:
+        ⋮
+     80      subparsers.add_parser("play-human", help="Play human vs human in th
+         e terminal")
+     81 +    play_model = subparsers.add_parser("play-model", help="Play against
+          the trained model")
+     82 +    play_model.add_argument("--checkpoint", default="artifacts/best.pt"
+         )
+     83 +    first_group = play_model.add_mutually_exclusive_group()
+     84 +    first_group.add_argument("--human-first", dest="human_first", actio
+         n="store_true")
+     85 +    first_group.add_argument("--human-second", dest="human_first", acti
+         on="store_false")
+     86 +    play_model.set_defaults(human_first=True)
+     87 +    play_model.add_argument("--simulations", type=int, default=320)
+     88 +    play_model.add_argument("--cpu", action="store_true", help="Force C
+         PU inference")
+     89 +
+     90 +    defaults = TrainingConfig()
+     91 +    train = subparsers.add_parser("train", help="Run AlphaZero-style se
+         lf-play training")
+     92 +    train.add_argument("--output-dir", default="artifacts")
+     93 +    train.add_argument("--resume", default=None)
+     94 +    train.add_argument("--iterations", type=int, default=defaults.itera
+         tions)
+     95 +    train.add_argument("--self-play-games", type=int, default=defaults.
+         self_play_games_per_iteration)
+     96 +    train.add_argument("--training-batches", type=int, default=defaults
+         .training_batches_per_iteration)
+     97 +    train.add_argument("--batch-size", type=int, default=defaults.batch
+         _size)
+     98 +    train.add_argument("--replay-buffer-capacity", type=int, default=de
+         faults.replay_buffer_capacity)
+     99 +    train.add_argument("--learning-rate", type=float, default=defaults.
+         learning_rate)
+    100 +    train.add_argument("--weight-decay", type=float, default=defaults.w
+         eight_decay)
+    101 +    train.add_argument("--scheduler-step-size", type=int, default=defau
+         lts.scheduler_step_size)
+    102 +    train.add_argument("--scheduler-gamma", type=float, default=default
+         s.scheduler_gamma)
+    103 +    train.add_argument("--seed", type=int, default=defaults.seed)
+    104 +    train.add_argument("--model-channels", type=int, default=defaults.m
+         odel_channels)
+    105 +    train.add_argument("--model-blocks", type=int, default=defaults.mod
+         el_blocks)
+    106 +    train.add_argument("--model-value-hidden", type=int, default=defaul
+         ts.model_value_hidden)
+    107 +    train.add_argument("--mcts-simulations", type=int, default=defaults
+         .mcts_simulations)
+    108 +    train.add_argument("--evaluation-simulations", type=int, default=de
+         faults.evaluation_simulations)
+    109 +    train.add_argument("--c-puct", type=float, default=defaults.c_puct)
+    110 +    train.add_argument("--dirichlet-alpha", type=float, default=default
+         s.dirichlet_alpha)
+    111 +    train.add_argument("--dirichlet-epsilon", type=float, default=defau
+         lts.dirichlet_epsilon)
+    112 +    train.add_argument("--temperature-moves", type=int, default=default
+         s.temperature_moves)
+    113 +    train.add_argument("--checkpoint-every", type=int, default=defaults
+         .checkpoint_every)
+    114 +    train.add_argument("--grad-clip-norm", type=float, default=defaults
+         .grad_clip_norm)
+    115 +    train.add_argument("--cpu", action="store_true", help="Force CPU tr
+         aining")
+    116      return parser
+        ⋮
+    123          return
+    124 +    if args.command == "play-model":
+    125 +        play_human_vs_model(
+    126 +            checkpoint_path=args.checkpoint,
+    127 +            human_first=args.human_first,
+    128 +            simulations=args.simulations,
+    129 +            prefer_cuda=not args.cpu,
+    130 +        )
+    131 +        return
+    132 +    if args.command == "train":
+    133 +        config = TrainingConfig(
+    134 +            iterations=args.iterations,
+    135 +            self_play_games_per_iteration=args.self_play_games,
+    136 +            training_batches_per_iteration=args.training_batches,
+    137 +            batch_size=args.batch_size,
+    138 +            replay_buffer_capacity=args.replay_buffer_capacity,
+    139 +            learning_rate=args.learning_rate,
+    140 +            weight_decay=args.weight_decay,
+    141 +            scheduler_step_size=args.scheduler_step_size,
+    142 +            scheduler_gamma=args.scheduler_gamma,
+    143 +            seed=args.seed,
+    144 +            model_channels=args.model_channels,
+    145 +            model_blocks=args.model_blocks,
+    146 +            model_value_hidden=args.model_value_hidden,
+    147 +            mcts_simulations=args.mcts_simulations,
+    148 +            evaluation_simulations=args.evaluation_simulations,
+    149 +            c_puct=args.c_puct,
+    150 +            dirichlet_alpha=args.dirichlet_alpha,
+    151 +            dirichlet_epsilon=args.dirichlet_epsilon,
+    152 +            temperature_moves=args.temperature_moves,
+    153 +            checkpoint_every=args.checkpoint_every,
+    154 +            grad_clip_norm=args.grad_clip_norm,
+    155 +        )
+    156 +        run_training(
+    157 +            config,
+    158 +            output_dir=args.output_dir,
+    159 +            resume_from=args.resume,
+    160 +            prefer_cuda=not args.cpu,
+    161 +        )
+    162 +        return
+    163      raise ValueError(f"unknown command: {args.command}")
+
+  └ player.sh (+4 -0)
+    1 +#!/usr/bin/env bash
+    2 +set -euo pipefail
+    3 +
+    4 +python -m connect4_zero.player_entry
+
+  └ setup.sh (+13 -0)
+     1 +#!/usr/bin/env bash
+     2 +set -euo pipefail
+     3 +
+     4 +python - <<'PY'
+     5 +import torch
+     6 +import numpy
+     7 +import pytest
+     8 +
+     9 +print("setup ok")
+    10 +print(f"torch={torch.__version__}")
+    11 +print(f"numpy={numpy.__version__}")
+    12 +print(f"pytest={pytest.__version__}")
+    13 +PY
+
+  └ tests/test_checkpoint_resume.py (+91 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +from pathlib import Path
+     4 +
+     5 +import numpy as np
+     6 +import torch
+     7 +
+     8 +from connect4_zero.checkpoint import seed_everything
+     9 +from connect4_zero.game import COLS, ROWS
+    10 +from connect4_zero.training import Trainer, TrainingConfig
+    11 +from connect4_zero.replay import ReplayExample
+    12 +
+    13 +
+    14 +def _populate_buffer(trainer: Trainer) -> None:
+    15 +    examples = []
+    16 +    for column in range(4):
+    17 +        board = np.zeros((ROWS, COLS), dtype=np.int8)
+    18 +        board[0, column] = 1
+    19 +        policy = np.zeros(COLS, dtype=np.float32)
+    20 +        policy[column] = 1.0
+    21 +        examples.append(ReplayExample(board=board, current_player=1, pol
+        icy=policy, outcome=1.0 if column % 2 == 0 else -1.0))
+    22 +    trainer.replay_buffer.extend(examples)
+    23 +
+    24 +
+    25 +def _parameter_snapshot(model: torch.nn.Module) -> dict[str, torch.Tenso
+        r]:
+    26 +    return {name: tensor.detach().cpu().clone() for name, tensor in mode
+        l.state_dict().items()}
+    27 +
+    28 +
+    29 +def _assert_optimizer_states_equal(left: dict, right: dict) -> None:
+    30 +    assert left["param_groups"] == right["param_groups"]
+    31 +    assert left["state"].keys() == right["state"].keys()
+    32 +    for key in left["state"]:
+    33 +        left_state = left["state"][key]
+    34 +        right_state = right["state"][key]
+    35 +        assert left_state.keys() == right_state.keys()
+    36 +        for field_name, left_value in left_state.items():
+    37 +            right_value = right_state[field_name]
+    38 +            if isinstance(left_value, torch.Tensor):
+    39 +                assert torch.equal(left_value, right_value)
+    40 +            else:
+    41 +                assert left_value == right_value
+    42 +
+    43 +
+    44 +def test_checkpoint_save_load_resume_is_identical(tmp_path: Path) -> Non
+        e:
+    45 +    config = TrainingConfig(
+    46 +        iterations=2,
+    47 +        self_play_games_per_iteration=1,
+    48 +        training_batches_per_iteration=2,
+    49 +        batch_size=4,
+    50 +        replay_buffer_capacity=32,
+    51 +        learning_rate=1e-2,
+    52 +        scheduler_step_size=1,
+    53 +        scheduler_gamma=0.5,
+    54 +        seed=42,
+    55 +        model_channels=16,
+    56 +        model_blocks=1,
+    57 +        model_value_hidden=32,
+    58 +    )
+    59 +
+    60 +    seed_everything(config.seed)
+    61 +    continuous = Trainer(config, device=torch.device("cpu"), output_dir=
+        tmp_path / "continuous")
+    62 +    _populate_buffer(continuous)
+    63 +    continuous.iteration = 1
+    64 +    continuous.train_phase()
+    65 +    continuous.iteration = 2
+    66 +    metrics_continuous = continuous.train_phase()
+    67 +    continuous_snapshot = _parameter_snapshot(continuous.model)
+    68 +    continuous_optimizer_state = continuous.optimizer.state_dict()
+    69 +    continuous_scheduler_state = continuous.scheduler.state_dict()
+    70 +    continuous_lr = continuous.optimizer.param_groups[0]["lr"]
+    71 +
+    72 +    seed_everything(config.seed)
+    73 +    saved = Trainer(config, device=torch.device("cpu"), output_dir=tmp_p
+        ath / "saved")
+    74 +    _populate_buffer(saved)
+    75 +    saved.iteration = 1
+    76 +    saved.train_phase()
+    77 +    checkpoint_path = saved.save("resume.pt")
+    78 +
+    79 +    resumed = Trainer(config, device=torch.device("cpu"), output_dir=tmp
+        _path / "resumed")
+    80 +    resumed.load(checkpoint_path)
+    81 +    assert resumed.iteration == 1
+    82 +    assert resumed.optimizer.param_groups[0]["lr"] == saved.optimizer.pa
+        ram_groups[0]["lr"]
+    83 +    resumed.iteration = 2
+    84 +    metrics_resumed = resumed.train_phase()
+    85 +
+    86 +    for name, tensor in continuous_snapshot.items():
+    87 +        assert torch.equal(tensor, resumed.model.state_dict()[name].deta
+        ch().cpu())
+    88 +    _assert_optimizer_states_equal(continuous_optimizer_state, resumed.o
+        ptimizer.state_dict())
+    89 +    assert continuous_scheduler_state == resumed.scheduler.state_dict()
+    90 +    assert continuous_lr == resumed.optimizer.param_groups[0]["lr"]
+    91 +    assert metrics_continuous.total_loss == metrics_resumed.total_loss
+
+  └ tests/test_mcts.py (+50 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +import numpy as np
+     4 +
+     5 +from connect4_zero.game import COLS, GameState
+     6 +from connect4_zero.mcts import MCTS, MCTSConfig
+     7 +
+     8 +
+     9 +def tactical_policy_value(state: GameState) -> tuple[np.ndarray, float]:
+    10 +    logits = np.zeros(COLS, dtype=np.float32)
+    11 +    legal_moves = state.legal_moves()
+    12 +    for move in legal_moves:
+    13 +        child = state.apply_move(move)
+    14 +        if child.winner == state.current_player:
+    15 +            logits[move] = 10.0
+    16 +        elif not child.is_terminal and any(child.apply_move(reply).winne
+        r == child.current_player for reply in child.legal_moves()):
+    17 +            logits[move] = -5.0
+    18 +        else:
+    19 +            logits[move] = 1.0 if move == 3 else 0.5
+    20 +    value = 0.95 if any(state.apply_move(move).winner == state.current_p
+        layer for move in legal_moves) else 0.0
+    21 +    return logits, value
+    22 +
+    23 +
+    24 +def test_mcts_finds_immediate_winning_move() -> None:
+    25 +    state = GameState.initial()
+    26 +    for move in [0, 0, 1, 1, 2, 2]:
+    27 +        state = state.apply_move(move)
+    28 +    search = MCTS(tactical_policy_value, MCTSConfig(simulations=48))
+    29 +    result = search.run(state, temperature=0.0, rng=np.random.default_rn
+        g(7))
+    30 +    assert result.move == 3
+    31 +    assert result.most_visited_move == 3
+    32 +    assert result.root_visit_count == 48
+    33 +
+    34 +
+    35 +def test_mcts_blocks_immediate_opponent_win() -> None:
+    36 +    state = GameState.initial()
+    37 +    for move in [4, 0, 4, 1, 5, 2]:
+    38 +        state = state.apply_move(move)
+    39 +    search = MCTS(tactical_policy_value, MCTSConfig(simulations=64))
+    40 +    result = search.run(state, temperature=0.0, rng=np.random.default_rn
+        g(11))
+    41 +    assert result.move == 3
+    42 +
+    43 +
+    44 +def test_mcts_top_actions_sorted_by_visits() -> None:
+    45 +    state = GameState.initial()
+    46 +    search = MCTS(tactical_policy_value, MCTSConfig(simulations=24))
+    47 +    result = search.run(state, temperature=0.0, rng=np.random.default_rn
+        g(5))
+    48 +    top_actions = result.top_actions(limit=3)
+    49 +    assert 1 <= len(top_actions) <= 3
+    50 +    assert top_actions == sorted(top_actions, key=lambda item: item[1],
+        reverse=True)
+
+  └ tests/test_model.py (+26 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +import torch
+     4 +
+     5 +from connect4_zero.game import ROWS, COLS
+     6 +from connect4_zero.model import Connect4Net, NetworkConfig, make_device
+     7 +
+     8 +
+     9 +def test_network_config_to_dict() -> None:
+    10 +    config = NetworkConfig(channels=32, residual_blocks=2, value_hidden=
+        64)
+    11 +    assert config.to_dict() == {"channels": 32, "residual_blocks": 2, "v
+        alue_hidden": 64}
+    12 +
+    13 +
+    14 +def test_connect4_net_forward_shapes() -> None:
+    15 +    model = Connect4Net(NetworkConfig(channels=16, residual_blocks=1, va
+        lue_hidden=32))
+    16 +    inputs = torch.randn(4, 3, ROWS, COLS)
+    17 +    policy, value = model(inputs)
+    18 +    assert policy.shape == (4, COLS)
+    19 +    assert value.shape == (4,)
+    20 +    assert torch.all(value <= 1.0)
+    21 +    assert torch.all(value >= -1.0)
+    22 +
+    23 +
+    24 +def test_make_device_returns_valid_device() -> None:
+    25 +    assert make_device(prefer_cuda=False).type == "cpu"
+    26 +    assert make_device(prefer_cuda=True).type in {"cpu", "cuda"}
+
+  └ tests/test_player_entry.py (+55 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +import os
+     4 +import subprocess
+     5 +import sys
+     6 +from pathlib import Path
+     7 +
+     8 +import torch
+     9 +
+    10 +from connect4_zero.game import GameState
+    11 +from connect4_zero.player_entry import read_game_state, select_next_move
+    12 +from connect4_zero.training import Trainer, TrainingConfig
+    13 +
+    14 +
+    15 +def _make_checkpoint(tmp_path: Path) -> Path:
+    16 +    trainer = Trainer(
+    17 +        TrainingConfig(
+    18 +            iterations=1,
+    19 +            self_play_games_per_iteration=1,
+    20 +            training_batches_per_iteration=1,
+    21 +            batch_size=2,
+    22 +            replay_buffer_capacity=8,
+    23 +            model_channels=8,
+    24 +            model_blocks=1,
+    25 +            model_value_hidden=16,
+    26 +            seed=7,
+    27 +        ),
+    28 +        device=torch.device("cpu"),
+    29 +        output_dir=tmp_path / "artifacts",
+    30 +    )
+    31 +    return trainer.save_best()
+    32 +
+    33 +
+    34 +def test_read_game_state_missing_file_returns_initial(tmp_path: Path) ->
+         None:
+    35 +    state = read_game_state(tmp_path / "missing.txt")
+    36 +    assert state == GameState.initial()
+    37 +
+    38 +
+    39 +def test_select_next_move_handles_terminal_state(tmp_path: Path) -> None
+        :
+    40 +    checkpoint = _make_checkpoint(tmp_path)
+    41 +    terminal = GameState.from_move_string("1122334")
+    42 +    assert terminal.winner == 1
+    43 +    assert select_next_move(terminal, checkpoint_path=checkpoint, simula
+        tions=8, prefer_cuda=False) == "LOSS"
+    44 +
+    45 +
+    46 +def test_player_script_writes_valid_move(tmp_path: Path) -> None:
+    47 +    checkpoint = _make_checkpoint(tmp_path)
+    48 +    (tmp_path / "game_state.txt").write_text("445566", encoding="utf-8")
+    49 +    env = os.environ.copy()
+    50 +    env["PYTHONPATH"] = "/workspace"
+    51 +    env["CONNECT4_MODEL_PATH"] = str(checkpoint)
+    52 +    env["CONNECT4_PLAYER_SIMULATIONS"] = "8"
+    53 +    subprocess.run(["bash", "/workspace/player.sh"], cwd=tmp_path, check
+        =True, env=env)
+    54 +    output = (tmp_path / "next_move.txt").read_text(encoding="utf-8")
+    55 +    assert output in {"1", "2", "3", "4", "5", "6", "7", "LOSS", "DRAW"}
+
+  └ tests/test_replay.py (+45 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +import numpy as np
+     4 +
+     5 +from connect4_zero.game import COLS, ROWS
+     6 +from connect4_zero.replay import ReplayBuffer, ReplayExample
+     7 +
+     8 +
+     9 +def _example(column: int, outcome: float) -> ReplayExample:
+    10 +    board = np.zeros((ROWS, COLS), dtype=np.int8)
+    11 +    board[0, column] = 1
+    12 +    policy = np.zeros(COLS, dtype=np.float32)
+    13 +    policy[column] = 1.0
+    14 +    return ReplayExample(board=board, current_player=1, policy=policy, o
+        utcome=outcome)
+    15 +
+    16 +
+    17 +def test_replay_example_encode_and_mirror() -> None:
+    18 +    example = _example(2, 1.0)
+    19 +    encoded = example.encode()
+    20 +    mirrored = example.mirrored()
+    21 +    assert encoded.shape == (3, ROWS, COLS)
+    22 +    assert mirrored.board[0, COLS - 1 - 2] == 1
+    23 +    assert mirrored.policy[COLS - 1 - 2] == 1.0
+    24 +
+    25 +
+    26 +def test_replay_buffer_add_sample_and_turnover() -> None:
+    27 +    buffer = ReplayBuffer(capacity=2)
+    28 +    buffer.add(_example(0, 1.0))
+    29 +    buffer.extend([_example(1, -1.0), _example(2, 0.0)])
+    30 +    assert len(buffer) == 2
+    31 +    assert buffer.turnover_rate() > 0.0
+    32 +    batch = buffer.sample(4, np.random.default_rng(123))
+    33 +    assert batch["boards"].shape == (4, 3, ROWS, COLS)
+    34 +    assert batch["policies"].shape == (4, COLS)
+    35 +    assert batch["outcomes"].shape == (4,)
+    36 +
+    37 +
+    38 +def test_replay_buffer_state_round_trip() -> None:
+    39 +    buffer = ReplayBuffer(capacity=4)
+    40 +    buffer.extend([_example(0, 1.0), _example(1, -1.0)])
+    41 +    restored = ReplayBuffer.from_state_dict(buffer.state_dict())
+    42 +    assert restored.capacity == buffer.capacity
+    43 +    assert restored.total_added == buffer.total_added
+    44 +    assert len(restored) == len(buffer)
+    45 +    assert np.array_equal(restored.examples[0].board, buffer.examples[0]
+        .board)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The second test wave is in place. I’m running the full suite now to shake out
+  integration issues across MCTS, checkpointing, and the evaluation script.
+
+• The suite is still running. I’m polling for failures rather than interrupting
+  it, then I’ll patch the first broken edge instead of piling on speculative
+  changes.
+
+• Ran chmod +x /workspace/player.sh /workspace/setup.sh && pytest -q /workspace/
+  │ tests
+  └ .......................F.F...
+    [100%]
+    … +128 lines
+    sub...
+    2 failed, 27 passed in 1.25s
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• Two integration issues surfaced: one test was using dataclass equality on a
+  NumPy-backed state, and player.sh relied on python being on PATH instead of
+  python3. I’m fixing both and rerunning the full suite.
+
+• Edited 3 files (+8 -3)
+  └ player.sh (+1 -1)
+    3
+    4 -python -m connect4_zero.player_entry
+    4 +python3 -m connect4_zero.player_entry
+
+  └ setup.sh (+1 -1)
+    3
+    4 -python - <<'PY'
+    4 +python3 - <<'PY'
+    5  import torch
+
+  └ tests/test_player_entry.py (+6 -1)
+    35      state = read_game_state(tmp_path / "missing.txt")
+    36 -    assert state == GameState.initial()
+    36 +    initial = GameState.initial()
+    37 +    assert state.current_player == initial.current_player
+    38 +    assert state.move_count == initial.move_count
+    39 +    assert state.winner == initial.winner
+    40 +    assert state.is_draw == initial.is_draw
+    41 +    assert (state.board == initial.board).all()
+    42
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The fixes are in and the suite is rerunning. I’m waiting for a clean pass
+  before I start the training run and artifact generation.
+
+• Waited for background terminal · pytest -q /workspace/tests
+
+• Ran pytest -q /workspace/tests
+  └ .............................
+    [100%]
+    29 passed in 2.22s
+
+• Updated Plan
+  └ Core implementation, AlphaZero stack, CLI, checkpointing, and tests are
+    passing. Final phase is generating artifacts, running training, and
+    validating the packaged player flow.
+    ✔ Create project scaffold, CODEX.md, and fully tested Connect 4 game/CLI
+      primitives
+    ✔ Implement neural net, MCTS, replay buffer, checkpointing, signal handling,
+      and training/eval CLIs
+    □ Add player.sh/setup.sh, run tests, execute a training run, and validate e
+      nd-to-end behavior
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The implementation path is stable enough to exercise the actual training loop
+  now. I’m checking hardware and then running a smoke training job first so I
+  can fix runtime issues before I commit to a longer artifact-producing run.
+
+• Ran python3 - <<'PY'
+  │ import torch
+  │ print('cuda_available=', torch.cuda.is_available())
+  │ … +2 lines
+  └ cuda_available= True
+    device_count= 1
+
+• Ran python3 -m connect4_zero train --iterations 1 --self-play-games 2
+  │ --training-batches 2 --batch-size 8 --replay-buffer-capacity 128
+  │ --model-channels 16 --model-blocks 1 --model-value-hidden 32
+  │ … +2 lines
+  └ [iteration 1] self-play summary | X win rate: 0.500 | O win rate: 0.500 |
+    draw rate: 0.000 | avg length: 18.50 | replay: 74 | turnover: 0.000
+    … +2 lines
+    value: 0.8658 | lr: 0.001000 | root move: 2 | root visits: 16.0 | root
+    value: -0.000
+
+────────────────────────────────────────────────────────────────────────────────
+
+• CUDA is available here. The smoke run is still in progress; I’m letting it
+  finish so I can see real self-play and checkpoint behavior before I scale the
+  run up.
+
+• Waited for background terminal
+
+• The smoke run completed cleanly, including self-play, training, logging, and
+  checkpoint writes. I’m measuring the packaged player path next so I can tune
+  inference simulations against the 30-second move budget before I commit to a
+  longer training run.
+
+• Ran python3 - <<'PY'
+  │ from pathlib import Path
+  │ import os
+  │ … +17 lines
+  └ elapsed_seconds=0.781
+    3
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The packaged player is comfortably under the 30-second budget on CPU with 320
+  simulations. I’m doing one short CPU-vs-GPU benchmark on a more realistic
+  training configuration so I can pick the faster path for the longer artifact
+  run instead of guessing.
+
+• The benchmark jobs are running in parallel, so I’m treating them as
+  directional rather than perfectly clean. I mainly want to know whether GPU is
+  obviously better or obviously worse for this very small per-node network
+  workload.
+
+• Ran python3 - <<'PY'
+  │ import shutil
+  │ from pathlib import Path
+  │ … +22 lines
+  └ [iteration 1] self-play summary | X win rate: 0.750 | O win rate: 0.250 |
+    draw rate: 0.000 | avg length: 24.75 | replay: 198 | turnover: 0.000
+    … +3 lines
+    value: 0.065
+    cpu_elapsed=3.179
+
+• Ran python3 - <<'PY'
+  │ import shutil
+  │ from pathlib import Path
+  │ … +21 lines
+  └ [iteration 1] self-play summary | X win rate: 0.250 | O win rate: 0.500 |
+    draw rate: 0.250 | avg length: 31.25 | replay: 250 | turnover: 0.000
+    … +3 lines
+    value: -0.038
+    gpu_elapsed=4.734
+
+• Waited for background terminal
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The benchmark points to CPU being the better default for this workload. I’m
+  switching the packaged competition entrypoint to CPU-first with an environment
+  override for CUDA, which keeps inference predictable across containers and
+  avoids paying GPU launch overhead on tiny board evaluations.
+
+• Edited connect4_zero/player_entry.py (+8 -2)
+    47      checkpoint_path = Path(os.environ.get("CONNECT4_MODEL_PATH", "artifa
+        cts/best.pt"))
+    48 -    simulations = int(os.environ.get("CONNECT4_PLAYER_SIMULATIONS", "320
+        "))
+    48 +    simulations = int(os.environ.get("CONNECT4_PLAYER_SIMULATIONS", "800
+        "))
+    49 +    prefer_cuda = os.environ.get("CONNECT4_USE_CUDA", "0") == "1"
+    50      state = read_game_state(game_state_path)
+    50 -    move = select_next_move(state, checkpoint_path=checkpoint_path, simu
+        lations=simulations)
+    51 +    move = select_next_move(
+    52 +        state,
+    53 +        checkpoint_path=checkpoint_path,
+    54 +        simulations=simulations,
+    55 +        prefer_cuda=prefer_cuda,
+    56 +    )
+    57      output_path.write_text(move, encoding="utf-8")
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I changed only the packaged inference path, so I’m rerunning the player and
+  resume tests specifically rather than burning time on the whole suite again.
+
+• Ran pytest -q /workspace/tests/test_player_entry.py /workspace/tests/
+  │ test_checkpoint_resume.py
+  └ ....
+    [100%]
+    4 passed in 1.87s
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m starting the artifact-producing training run now on CPU with the faster
+  path from the benchmark. The run is sized to be materially stronger than the
+  smoke test while still finishing comfortably inside the project window, and
+  I’ll watch the iteration logs for loss decay, draw rate, and any sign of
+  instability.
+
+• The longer run is underway. I’m polling the iteration output and will adjust
+  only if the metrics show an obvious problem; otherwise I’m letting it
+  accumulate training signal uninterrupted.
+
+• Waited for background terminal · python3 -m connect4_zero train --iterations
+16 --self-play-games 16 --training-batches 48 --batch-size 128 --replay-buffer-
+capacity 100000 --model-channels 64 --model-blocks 4 --model-value-hidden 128
+--mcts-simulations 96 --temperature-moves 8 --scheduler-step-size 8 --scheduler-
+gamma 0.5 --checkpoint-every 1 --output-dir artifacts --cpu
+
+• The first full iteration is slower than the smoke run as expected with the
+  larger network and 96-search self-play. There’s no failure signal yet, so I’m
+  still waiting on the first logged summary instead of interrupting a healthy
+  run.
+
+• Waited for background terminal · python3 -m connect4_zero train --iterations
+16 --self-play-games 16 --training-batches 48 --batch-size 128 --replay-buffer-
+capacity 100000 --model-channels 64 --model-blocks 4 --model-value-hidden 128
+--mcts-simulations 96 --temperature-moves 8 --scheduler-step-size 8 --scheduler-
+gamma 0.5 --checkpoint-every 1 --output-dir artifacts --cpu
+
+• The process is likely line-buffering because it isn’t attached to a TTY, so I
+  may not see per-iteration text until it exits or flushes. I’m keeping it
+  running because the command itself is still healthy, and I’ll verify artifacts
+  on disk while it works if the buffer stays quiet much longer.
+
+• Waited for background terminal · python3 -m connect4_zero train --iterations
+16 --self-play-games 16 --training-batches 48 --batch-size 128 --replay-buffer-
+capacity 100000 --model-channels 64 --model-blocks 4 --model-value-hidden 128
+--mcts-simulations 96 --temperature-moves 8 --scheduler-step-size 8 --scheduler-
+gamma 0.5 --checkpoint-every 1 --output-dir artifacts --cpu
+
+• Explored
+  └ List artifacts
+
+─ Worked for 1m 16s ────────────────────────────────────────────────────────────
+
+• Training is definitely progressing: checkpoints through iteration 4 and the
+  main CSV already exist. I’m reading the latest log rows directly from disk now
+  so I can monitor actual convergence even though stdout is buffered.
+
+• Waited for background terminal · python3 -m connect4_zero train --iterations
+16 --self-play-games 16 --training-batches 48 --batch-size 128 --replay-buffer-
+capacity 100000 --model-channels 64 --model-blocks 4 --model-value-hidden 128
+--mcts-simulations 96 --temperature-moves 8 --scheduler-step-size 8 --scheduler-
+gamma 0.5 --checkpoint-every 1 --output-dir artifacts --cpu
+
+• Explored
+  └ Read training_log.csv
+
+─ Worked for 1m 04s ────────────────────────────────────────────────────────────
+
+• The larger run is moving quickly enough that the original 16-iteration target
+  won’t exhaust the available window. I’m checking whether the loss is still
+  trending down after the mid-run point, because if it is, I’ll extend the run
+  instead of stopping at the first planned boundary.
+
+• Waited for background terminal · python3 -m connect4_zero train --iterations
+16 --self-play-games 16 --training-batches 48 --batch-size 128 --replay-buffer-
+capacity 100000 --model-channels 64 --model-blocks 4 --model-value-hidden 128
+--mcts-simulations 96 --temperature-moves 8 --scheduler-step-size 8 --scheduler-
+gamma 0.5 --checkpoint-every 1 --output-dir artifacts --cpu
+
+• Explored
+  └ Read training_log.csv
+
+─ Worked for 1m 05s ────────────────────────────────────────────────────────────
+
+• The loss is still improving after the first learning-rate drop, so there’s no
+  reason to stop at 9 iterations. I’m checking whether the planned 16 have
+  completed cleanly, and if they have I’ll likely resume beyond that while the
+  trend is still favorable.
+
+• Waited for background terminal · python3 -m connect4_zero train --iterations
+16 --self-play-games 16 --training-batches 48 --batch-size 128 --replay-buffer-
+capacity 100000 --model-channels 64 --model-blocks 4 --model-value-hidden 128
+--mcts-simulations 96 --temperature-moves 8 --scheduler-step-size 8 --scheduler-
+gamma 0.5 --checkpoint-every 1 --output-dir artifacts --cpu
+
+• Explored
+  └ List checkpoints
+    Read training_log.csv
+
+────────────────────────────────────────────────────────────────────────────────
+
+• By iteration 13 the run is still stable, but the easy gains have slowed. I
+  want to see the effect of the second learning-rate drop at iteration 16 before
+  deciding whether to continue past the original target.
+
+• Waited for background terminal · python3 -m connect4_zero train --iterations
+16 --self-play-games 16 --training-batches 48 --batch-size 128 --replay-buffer-
+capacity 100000 --model-channels 64 --model-blocks 4 --model-value-hidden 128
+--mcts-simulations 96 --temperature-moves 8 --scheduler-step-size 8 --scheduler-
+gamma 0.5 --checkpoint-every 1 --output-dir artifacts --cpu
+
+• Ran python3 -m connect4_zero train --iterations 16 --self-play-games 16
+  │ --training-batches 48 --batch-size 128 --replay-buffer-capacity 100000
+  │ --model-channels 64 --model-blocks 4 --model-value-hidden 128
+  │ … +2 lines
+  └ [iteration 1] self-play summary | X win rate: 0.312 | O win rate: 0.625 |
+    draw rate: 0.062 | avg length: 30.06 | replay: 962 | turnover: 0.000
+    … +53 lines
+    value: 0.2958 | lr: 0.000250 | root move: 4 | root visits: 96.0 | root
+    value: 0.407
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The first substantive run finished cleanly through iteration 16, and the key
+  signal is that iteration 16 produced the best loss so far right after the
+  second LR drop. That’s a strong reason to keep going, so I’m resuming the same
+  run out to 32 iterations instead of freezing a model while it’s still
+  improving.
+
+• The resume run is active. Since stdout is buffered again, I’m monitoring the
+  CSV and checkpoint files directly for fresh iterations rather than waiting for
+  terminal text.
+
+• Waited for background terminal · python3 -m connect4_zero train --resume
+artifacts/checkpoints/latest.pt --iterations 32 --self-play-games 16 --training-
+batches 48 --batch-size 128 --replay-buffer-capacity 100000 --model-channels 64
+--model-blocks 4 --model-value-hidden 128 --mcts-simulations 96 --temperature-
+moves 8 --scheduler-step-size 8 --scheduler-gamma 0.5 --checkpoint-every 1
+--output-dir artifacts --cpu
+
+• I’m reading the resumed run’s tail from disk now. What matters here is whether
+  the post-resume iterations are still pushing the floor down and whether the
+  replay buffer remains healthy, not whether the subprocess flushes its print
+  statements.
+
+• Explored
+  └ Read training_log.csv
+
+─ Worked for 1m 14s ────────────────────────────────────────────────────────────
+
+• The resumed run is doing better than the first segment: iterations 17, 18, and
+  20 all beat the previous best, which means the model was not ready to stop at
+  16. I’m letting the run complete to 32, then I’ll decide whether the next LR
+  drop justifies one more extension.
+
+• Waited for background terminal · python3 -m connect4_zero train --resume
+artifacts/checkpoints/latest.pt --iterations 32 --self-play-games 16 --training-
+batches 48 --batch-size 128 --replay-buffer-capacity 100000 --model-channels 64
+--model-blocks 4 --model-value-hidden 128 --mcts-simulations 96 --temperature-
+moves 8 --scheduler-step-size 8 --scheduler-gamma 0.5 --checkpoint-every 1
+--output-dir artifacts --cpu
+
+• I’m pulling the tail again. At this point I’m looking for whether the 24-
+  iteration LR drop created another step down or whether the run has started
+  oscillating around a floor.
+
+• Waited for background terminal · python3 -m connect4_zero train --resume
+artifacts/checkpoints/latest.pt --iterations 32 --self-play-games 16 --training-
+batches 48 --batch-size 128 --replay-buffer-capacity 100000 --model-channels 64
+--model-blocks 4 --model-value-hidden 128 --mcts-simulations 96 --temperature-
+moves 8 --scheduler-step-size 8 --scheduler-gamma 0.5 --checkpoint-every 1
+--output-dir artifacts --cpu
+
+• Explored
+  └ Read training_log.csv
+    List checkpoints
+
+─ Worked for 1m 44s ────────────────────────────────────────────────────────────
+
+• The 24-iteration LR drop produced another local improvement by iteration 26,
+  so the run still has life. I’m letting it finish to 32 and then deciding
+  whether the curve has flattened enough to stop or whether one more extension
+  is justified.
+
+• Waited for background terminal · python3 -m connect4_zero train --resume
+artifacts/checkpoints/latest.pt --iterations 32 --self-play-games 16 --training-
+batches 48 --batch-size 128 --replay-buffer-capacity 100000 --model-channels 64
+--model-blocks 4 --model-value-hidden 128 --mcts-simulations 96 --temperature-
+moves 8 --scheduler-step-size 8 --scheduler-gamma 0.5 --checkpoint-every 1
+--output-dir artifacts --cpu
+
+• Ran python3 -m connect4_zero train --resume artifacts/checkpoints/latest.pt
+  │ --iterations 32 --self-play-games 16 --training-batches 48 --batch-size
+  │ 128 --replay-buffer-capacity 100000 --model-channels 64 --model-blocks 4
+  │ … +3 lines
+  └ Resumed from checkpoint: artifacts/checkpoints/latest.pt
+    [iteration 17] self-play summary | X win rate: 0.688 | O win rate: 0.312 |
+    … +54 lines
+    value: 0.3296 | lr: 0.000063 | root move: 4 | root visits: 96.0 | root
+    value: 0.625
+
+─ Worked for 1m 02s ────────────────────────────────────────────────────────────
+
+• The curve has flattened but not collapsed: the best checkpoint is still
+  improving late, and iteration 32 just introduced another LR drop. That makes
+  one more extension defensible, so I’m resuming to 48 rather than freezing
+  immediately after a fresh schedule change.
+
+• The final extension is running. If the post-32 iterations fail to produce a
+  new best after the new LR step, I’ll stop there and keep the strongest
+  existing checkpoint; if they do, then this extension was the right call.
+
+• Waited for background terminal · python3 -m connect4_zero train --resume
+artifacts/checkpoints/latest.pt --iterations 48 --self-play-games 16 --training-
+batches 48 --batch-size 128 --replay-buffer-capacity 100000 --model-channels 64
+--model-blocks 4 --model-value-hidden 128 --mcts-simulations 96 --temperature-
+moves 8 --scheduler-step-size 8 --scheduler-gamma 0.5 --checkpoint-every 1
+--output-dir artifacts --cpu
+
+• I’m checking the post-32 segment from the CSV rather than waiting for buffered
+  stdout. The decision point here is simple: either the new LR band makes a new
+  low, or it doesn’t.
+
+• Explored
+  └ Read training_log.csv
+
+─ Worked for 1m 40s ────────────────────────────────────────────────────────────
+
+• The post-32 segment has not made a meaningful new low yet; iteration 34 came
+  close, but it did not beat iteration 26. I’m letting the already-started run
+  finish to 48, but unless the remaining tail produces a new best, I’ll stop
+  there rather than extending again.
+
+• Waited for background terminal · python3 -m connect4_zero train --resume
+artifacts/checkpoints/latest.pt --iterations 48 --self-play-games 16 --training-
+batches 48 --batch-size 128 --replay-buffer-capacity 100000 --model-channels 64
+--model-blocks 4 --model-value-hidden 128 --mcts-simulations 96 --temperature-
+moves 8 --scheduler-step-size 8 --scheduler-gamma 0.5 --checkpoint-every 1
+--output-dir artifacts --cpu
+
+• I’m on the last stretch of the training run now. The only remaining question
+  is whether the best checkpoint stays anchored in the mid-20s or the tail
+  sneaks under it.
+
+• Waited for background terminal · python3 -m connect4_zero train --resume
+artifacts/checkpoints/latest.pt --iterations 48 --self-play-games 16 --training-
+batches 48 --batch-size 128 --replay-buffer-capacity 100000 --model-channels 64
+--model-blocks 4 --model-value-hidden 128 --mcts-simulations 96 --temperature-
+moves 8 --scheduler-step-size 8 --scheduler-gamma 0.5 --checkpoint-every 1
+--output-dir artifacts --cpu
+
+• Explored
+  └ Read training_log.csv
+    List checkpoints
+
+─ Worked for 1m 21s ────────────────────────────────────────────────────────────
+
+• The tail has not beaten the checkpoint from iteration 26. At this point I’m
+  not expecting another extension after 48 unless the remaining few iterations
+  surprise us.
+
+• Waited for background terminal · python3 -m connect4_zero train --resume
+artifacts/checkpoints/latest.pt --iterations 48 --self-play-games 16 --training-
+batches 48 --batch-size 128 --replay-buffer-capacity 100000 --model-channels 64
+--model-blocks 4 --model-value-hidden 128 --mcts-simulations 96 --temperature-
+moves 8 --scheduler-step-size 8 --scheduler-gamma 0.5 --checkpoint-every 1
+--output-dir artifacts --cpu
+
+• Ran python3 -m connect4_zero train --resume artifacts/checkpoints/latest.pt
+  │ --iterations 48 --self-play-games 16 --training-batches 48 --batch-size
+  │ 128 --replay-buffer-capacity 100000 --model-channels 64 --model-blocks 4
+  │ … +3 lines
+  └ Resumed from checkpoint: artifacts/checkpoints/latest.pt
+    [iteration 33] self-play summary | X win rate: 0.750 | O win rate: 0.250 |
+    … +54 lines
+    value: 0.3380 | lr: 0.000016 | root move: 4 | root visits: 96.0 | root
+    value: 0.608
+
+─ Worked for 1m 05s ────────────────────────────────────────────────────────────
+
+• I’m checking the final tail now. If the best loss still belongs to iteration
+  26 or thereabouts, I’ll stop cleanly and keep that best checkpoint rather than
+  chasing diminishing returns.
+
+• Waited for background terminal
+
+• Explored
+  └ Read training_log.csv
+    List checkpoints
+
+────────────────────────────────────────────────────────────────────────────────
+
+• Training is complete, and the tail confirmed the run had flattened out rather
+  than producing new lows after iteration 32. I’m doing the final validation
+  pass now: full tests, packaged-player timing, and a couple of tactical sanity
+  checks against the trained checkpoint.
+
+• Ran python3 - <<'PY'
+  │ from connect4_zero.game import GameState
+  │ from connect4_zero.player_entry import select_next_move
+  │ … +5 lines
+  └ winning_test_move= 4
+
+• Ran python3 - <<'PY'
+  │ import torch
+  │ payload = torch.load('/workspace/artifacts/best.pt', map_location='cpu',
+  │ … +5 lines
+  └ best_iteration= 26
+    best_loss= 1.0558941041429837
+    buffer_size= 18520
+
+• Ran python3 - <<'PY'
+  │ from pathlib import Path
+  │ import os
+  │ … +17 lines
+  └ elapsed_seconds=1.133
+    7
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The packaged player is well inside the time budget on CPU at 800 simulations,
+  and it found an immediate winning move in a simple tactical spot. I’m just
+  waiting on the full test suite to close the loop.
+
+• Ran pytest -q /workspace/tests
+  └ .............................
+    [100%]
+    29 passed in 2.11s
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’ve got the final artifacts I need. I’m cleaning out the throwaway benchmark/
+  smoke directories so the workspace only keeps the deliverables and useful
+  training outputs.
+
+• The cleanup command was blocked by the environment policy, so the benchmark
+  directories are still present. I’m updating CODEX.md with the final design and
+  training results now so the workspace state is documented even if those extra
+  folders remain.
+
+• Edited CODEX.md (+27 -5)
+    12  ## Current Progress
+    13 -- Initialized project structure.
+    13  - Implemented the core Connect 4 rules engine and terminal human-vs-huma
+        n mode.
+    15 -- Added thorough unit tests for move application, win detection, seriali
+        zation, and display helpers.
+    14 +- Implemented the AlphaZero-style stack: residual CNN, MCTS, replay buff
+        er, self-play training, CSV/terminal logging, checkpointing, resume, and
+         SIGINT handling.
+    15 +- Implemented human-vs-model play and the competition entrypoint in `pla
+        yer.sh`.
+    16 +- Added tests covering game rules, network forward pass, replay buffer b
+        ehavior, MCTS tactics, checkpoint resume determinism, and player script
+        I/O.
+    17 +- Ran the full test suite successfully.
+    18 +- Ran training through 48 iterations and kept the best checkpoint produc
+        ed during the run.
+    19
+       ⋮
+    23  - Game states are immutable snapshots: each move returns a new `GameStat
+        e`. This keeps MCTS tree expansion and replay-buffer bookkeeping safer.
+    24 +- The network is a small residual CNN (`64` channels, `4` residual block
+        s for the final training run). This is large enough to model Connect 4 p
+        atterns while staying fast enough for many MCTS calls on CPU.
+    25 +- MCTS logs use the opening position of each self-play game to summarize
+         root statistics per iteration. The logged root move is the modal most-v
+        isited opening move for that iteration.
+    26 +- `player.sh` defaults to CPU-backed inference because a benchmark in th
+        is environment showed CPU was faster than GPU for the small batch-1 sear
+        ch workload. CUDA can still be enabled for the competition entrypoint by
+         setting `CONNECT4_USE_CUDA=1`.
+    27 +- The competition entrypoint defaults to `800` MCTS simulations per move
+        . This stayed well below the 30-second budget in local validation.
+    28 +
+    29 +## Training Summary
+    30 +- Final long run: iterations `1-48`, `16` self-play games per iteration,
+         `96` MCTS simulations per self-play move, `48` training batches per ite
+        ration, batch size `128`.
+    31 +- Learning-rate schedule: step decay every `8` iterations with gamma `0.
+        5`.
+    32 +- Best checkpoint: `artifacts/best.pt`
+    33 +  - Best iteration: `26`
+    34 +  - Best loss: `1.0558941041429837`
+    35 +  - Replay buffer size at best checkpoint: `18520`
+    36 +- Stopping rationale: after resuming past iteration `32`, additional LR
+        drops did not beat the mid-run best loss from iteration `26`, so the run
+         appeared to have flattened rather than continuing to improve.
+    37 +
+    38 +## Validation Notes
+    39 +- `pytest -q tests` passed with `29` tests.
+    40 +- `player.sh` produced a move in about `1.13s` on CPU with `800` simulat
+        ions in a local timing check.
+    41 +- A tactical sanity check on the trained model selected the immediate wi
+        nning move in the position `112233` (output `4`).
+    42
+    22 -## Known Issues / TODO
+    23 -- Implement neural network, MCTS, replay buffer, training loop, checkpoi
+        nting, and human-vs-model mode.
+    24 -- Add evaluation entrypoint and training artifacts.
+    43 +## Workspace Notes
+    44 +- Training logs are in `artifacts/training_log.csv`.
+    45 +- Per-iteration checkpoints are in `artifacts/checkpoints/`.
+    46 +- Short benchmark/smoke artifact directories created during tuning remai
+        n in the workspace because an attempted cleanup command was blocked by p
+        olicy.
+
+────────────────────────────────────────────────────────────────────────────────
+
+• Completed in connect4_zero/game.py, connect4_zero/mcts.py, connect4_zero/
+  training.py, connect4_zero/cli.py, connect4_zero/player_entry.py, and
+  player.sh. The project now includes terminal human-vs-human play, AlphaZero-
+  style self-play training, per-iteration CSV/terminal logging, checkpoint/
+  resume with replay buffer and RNG state, SIGINT-safe shutdown, human-vs-model
+  play, and the competition entrypoint.
+
+  The trained artifact is artifacts/best.pt. The best checkpoint came from
+  iteration 26 with loss 1.0558941041429837; logs are in artifacts/
+  training_log.csv, resumable checkpoints are in artifacts/checkpoints/
+  latest.pt, and the final run notes are in CODEX.md.
+
+  Verification: pytest -q tests passed with 29 tests. player.sh produced a move
+  in about 1.13s on CPU at 800 simulations, and a tactical sanity check on
+  position 112233 chose the immediate winning move 4.
+Token usage: total=90,875 input=37,353 (+ 3,042,944 cached) output=53,522 (reasoning 26,239)
+To continue this session, run codex resume 019d55d0-82a7-7a52-9f6d-33db36f8fa37
+Script done.
+rt1@rt1:~/Documents/phase2/connect4/codexfast_s/t5/init$ 
+

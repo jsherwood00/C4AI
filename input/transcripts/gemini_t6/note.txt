@@ -1,0 +1,14 @@
+This output.txt is the CLEANED transcript produced by running
+clean_gemini_log.sh on the original raw transcript from this trial.
+
+  raw output.txt  (arena_apr6/gemini_t6):  1201289 lines
+  cleaned output.txt (this dir):    2408 lines
+
+The raw transcript was dominated by ANSI escape sequences, repeated UI
+redraws, and other terminal noise from Gemini's CLI (hundreds of MB of
+mostly duplicate lines). It is not shipped here due to size. To
+reproduce from the raw source, obtain the original output.txt from the
+arena_apr6 dataset and run:
+
+  ./clean_gemini_log.sh raw_output.txt > output.txt
+

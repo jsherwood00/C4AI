@@ -1,0 +1,3467 @@
+rt1@rt1:~/Documents/phase2/connect4/codexfast_s/t6/init$ sudo ./run.sh
+[sudo] password for rt1: 
+[+] Building 0.4s (19/19) FINISHED                               docker:default
+ => [internal] load build definition from Dockerfile                       0.0s
+ => => transferring dockerfile: 1.32kB                                     0.0s
+ => [internal] load metadata for docker.io/nvidia/cuda:12.8.0-devel-ubunt  0.3s
+ => [internal] load .dockerignore                                          0.0s
+ => => transferring context: 2B                                            0.0s
+ => [ 1/14] FROM docker.io/nvidia/cuda:12.8.0-devel-ubuntu24.04@sha256:9a  0.0s
+ => [internal] load build context                                          0.0s
+ => => transferring context: 65B                                           0.0s
+ => CACHED [ 2/14] RUN apt-get update && apt-get install -y --no-install-  0.0s
+ => CACHED [ 3/14] RUN curl -fsSL https://deb.nodesource.com/setup_22.x |  0.0s
+ => CACHED [ 4/14] RUN npm install -g @openai/codex                        0.0s
+ => CACHED [ 5/14] RUN pip install --break-system-packages --pre torch --  0.0s
+ => CACHED [ 6/14] RUN pip install --break-system-packages numpy pytest t  0.0s
+ => CACHED [ 7/14] RUN pip install --break-system-packages numpy pytest t  0.0s
+ => CACHED [ 8/14] RUN usermod -l codex -d /home/codex -m ubuntu && group  0.0s
+ => CACHED [ 9/14] RUN mkdir -p /workspace /output && chown codex:codex /  0.0s
+ => CACHED [10/14] COPY squid.conf /etc/squid/squid.conf                   0.0s
+ => CACHED [11/14] RUN mkdir -p /var/log/squid && chown proxy:proxy /var/  0.0s
+ => CACHED [12/14] COPY entrypoint.sh /entrypoint.sh                       0.0s
+ => CACHED [13/14] RUN chmod +x /entrypoint.sh                             0.0s
+ => CACHED [14/14] WORKDIR /workspace                                      0.0s
+ => exporting to image                                                     0.0s
+ => => exporting layers                                                    0.0s
+ => => writing image sha256:f303e8ec7c81f76f83e0c18e582a596a2d1c7afdccd8b  0.0s
+ => => naming to docker.io/library/codex-sandbox                           0.0s
+Waiting for Squid to listen on port 3128... (1/30)
+Squid proxy is ready on port 3128.
+Script started, output log file is '/workspace/session.log'.
+╭─────────────────────────────────────────────────╮
+│ ✨ Update available! 0.111.0 -> 0.118.0         │
+│ Run npm install -g @openai/codex to update.     │
+│                                                 │
+│ See full release notes:                         │
+│ https://github.com/openai/codex/releases/latest │
+╰─────────────────────────────────────────────────╯
+
+╭────────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.111.0)                         │
+│                                                    │
+│ model:     gpt-5.4 xhigh   fast   /model to change │
+│ directory: /workspace                              │
+╰────────────────────────────────────────────────────╯
+
+  Tip: Use /status to see the current model, approvals, and token usage.
+
+
+› Hi Codex, please complete the project as specified in project_spec.md
+
+
+• I’m going to inspect the repository and read project_spec.md first, then trace
+  the relevant code paths before making changes.
+
+• Ran pwd
+  └ /workspace
+
+• Explored
+  └ List workspace
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The workspace is minimal. I’ve confirmed the spec file is the only substantive
+  project artifact, so I’m reading that next and will build from it directly.
+
+• Explored
+  └ Read project_spec.md, session.log
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I have the full spec. Next I’m checking deadline/state files and then I’ll lay
+  down the project skeleton so implementation, tests, and training can proceed
+  in a controlled sequence.
+
+• Explored
+  └ List workspace
+
+• Ran if [ -f /workspace/.deadline ]; then sed -n '1,120p' /workspace/.deadline;
+  │ fi
+  └ Start time: Fri Apr  3 19:32:00 CDT 2026
+    End time: Fri Apr  3 22:32:00 CDT 2026
+
+• Ran git -C /workspace status --short
+  └ fatal: not a git repository (or any parent up to mount point /)
+    Stopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The deadline window is explicit: April 3, 2026 from 19:32 to 22:32 CDT.
+  There’s no existing codebase or git history here, so I’m building the full
+  implementation from scratch and tracking decisions in CODEX.md.
+
+• Updated Plan
+  └ Building a full Connect 4 engine, AlphaZero-style trainer, checkpoint/resume
+    flow, CLI modes, evaluation script, and tests from an empty workspace.
+    □ Create project scaffold, CODEX.md, and core Connect 4 game logic with
+      terminal CLI
+    □ Add thorough tests for game rules, rendering, and terminal-facing
+      utilities
+    □ Implement neural network, MCTS, self-play replay buffer, training loop,
+      logging, checkpointing, and resume/SIGINT handling
+    □ Add human-vs-model mode, evaluation player.sh/setup.sh pipeline, and dete
+      rministic resume tests
+    □ Run test suite, execute training to produce a usable checkpoint/model,
+      validate player.sh end-to-end, and finalize CODEX.md
+
+• Implementation plan:
+
+  1. Build the game engine and CLI first, with tests locking down move legality,
+     win detection, draw handling, parsing, and board rendering.
+  2. Layer in the AlphaZero stack next: residual policy/value net, PUCT MCTS,
+     self-play, replay buffer, per-iteration CSV logging, and checkpoint/resume
+     with RNG preservation.
+  3. Finish with human-vs-model and player.sh, then run training to produce a
+     checkpoint/model and validate the evaluation path end to end.
+
+• I’m at the architecture choice point now. I’m checking local compute
+  capability before finalizing the network/MCTS defaults, because that affects
+  both training throughput and the evaluation-time simulation budget.
+
+• Ran python - <<'PY'
+  │ import torch
+  │ print('torch', torch.__version__)
+  │ … +5 lines
+  └ /bin/bash: line 1: python: command not found
+
+• Ran python - <<'PY'
+  │ from datetime import datetime
+  │ print(datetime.utcnow().isoformat() + 'Z')
+  │ … +1 lines
+  └ /bin/bash: line 1: python: command not found
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The environment only exposes python3, not python. I’m switching the scripts
+  and commands to that explicitly so the runtime path matches what’s actually
+  available here.The container has python3, not python. I’m rerunning the
+  environment probe with the correct interpreter and then I’ll lock in the
+  implementation defaults.
+
+• Ran python3 - <<'PY'
+  │ from datetime import datetime, timezone
+  │ print(datetime.now(timezone.utc).isoformat())
+  │ … +1 lines
+  └ 2026-04-04T00:33:39.606901+00:00
+
+• Ran python3 - <<'PY'
+  │ import torch
+  │ print('torch', torch.__version__)
+  │ … +5 lines
+  └ torch 2.12.0.dev20260307+cu128
+    cuda True
+    device_count 1
+    name NVIDIA GeForce RTX 5060 Ti
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’ve confirmed there’s a CUDA GPU available, so I’m targeting a small residual
+  network rather than an ultra-tiny CPU-only model. I’m creating the package/
+  test layout now, then I’ll land the core engine and its tests first.
+
+• Ran mkdir -p /workspace/connect4_zero /workspace/tests /workspace/artifacts
+  └ (no output)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m writing the first concrete layer now: the immutable game state, history
+  parsing, and the first test tranche. Once that passes, I’ll extend the CLI and
+  training stack on top of stable rules rather than debugging everything at
+  once.
+
+• Edited 6 files (+530 -0)
+  └ CODEX.md (+24 -0)
+     1 +# CODEX Notes
+     2 +
+     3 +## Project Overview
+     4 +
+     5 +- Goal: implement terminal-playable Connect 4, AlphaZero-style self-play
+         training, checkpoint/resume, human-vs-model play, and an evaluation-tim
+        e `player.sh`.
+     6 +- Constraint: everything must live under `/workspace`; no existing codeb
+        ase is present.
+     7 +
+     8 +## Decisions So Far
+     9 +
+    10 +- Core game state uses immutable bitboards rather than mutable matrices.
+         This keeps rule evaluation fast and reduces Python overhead during MCTS
+        .
+    11 +- Internal row indexing is bottom-up because it matches Connect 4 gravit
+        y and simplifies move application.
+    12 +- The first implementation phase is locking down game correctness with t
+        ests before adding the neural network and training stack.
+    13 +
+    14 +## Progress Log
+    15 +
+    16 +- Read `project_spec.md` and `.deadline`.
+    17 +- Confirmed the environment has `python3`, PyTorch nightly, and a CUDA G
+        PU.
+    18 +- Created initial package layout and implemented the core Connect 4 game
+         logic plus a human-vs-human CLI shell.
+    19 +- Added the first rule/encoding/rendering tests.
+    20 +
+    21 +## Known Gaps
+    22 +
+    23 +- The CLI currently only supports human-vs-human mode.
+    24 +- Training, MCTS, checkpointing, resume logic, and evaluation scripts ar
+        e not implemented yet.
+
+  └ connect4_zero/__init__.py (+23 -0)
+     1 +"""Connect 4 AlphaZero-style training project."""
+     2 +
+     3 +from .game import (
+     4 +    COLS,
+     5 +    ROWS,
+     6 +    Connect4State,
+     7 +    InvalidMoveError,
+     8 +    PLAYER_ONE,
+     9 +    PLAYER_TWO,
+    10 +    bit_for_position,
+    11 +    parse_move_sequence,
+    12 +)
+    13 +
+    14 +__all__ = [
+    15 +    "COLS",
+    16 +    "ROWS",
+    17 +    "Connect4State",
+    18 +    "InvalidMoveError",
+    19 +    "PLAYER_ONE",
+    20 +    "PLAYER_TWO",
+    21 +    "bit_for_position",
+    22 +    "parse_move_sequence",
+    23 +]
+
+  └ connect4_zero/cli.py (+49 -0)
+     1 +"""Command-line entrypoints for human-playable Connect 4."""
+     2 +
+     3 +from __future__ import annotations
+     4 +
+     5 +import argparse
+     6 +import sys
+     7 +
+     8 +from .game import Connect4State, InvalidMoveError, PLAYER_ONE
+     9 +
+    10 +
+    11 +def play_human_vs_human() -> int:
+    12 +    state = Connect4State.new_game()
+    13 +    while True:
+    14 +        print(state.ascii_board())
+    15 +        if state.is_terminal():
+    16 +            if state.winner == 0:
+    17 +                print("Game over: draw.")
+    18 +            else:
+    19 +                player_name = "Player 1 (X)" if state.winner == PLAYER_O
+        NE else "Player 2 (O)"
+    20 +                print(f"Game over: {player_name} wins.")
+    21 +            return 0
+    22 +
+    23 +        player_name = "Player 1 (X)" if state.current_player == PLAYER_O
+        NE else "Player 2 (O)"
+    24 +        response = input(f"{player_name}, choose a column (1-7): ").stri
+        p()
+    25 +        try:
+    26 +            column = int(response) - 1
+    27 +            state = state.play(column)
+    28 +        except (ValueError, InvalidMoveError):
+    29 +            print("Invalid move. Choose a non-full column from 1 to 7.")
+    30 +
+    31 +
+    32 +def build_parser() -> argparse.ArgumentParser:
+    33 +    parser = argparse.ArgumentParser(description="Connect 4")
+    34 +    subparsers = parser.add_subparsers(dest="command", required=True)
+    35 +    subparsers.add_parser("play-human", help="Play a human vs human game
+         in the terminal")
+    36 +    return parser
+    37 +
+    38 +
+    39 +def main(argv: list[str] | None = None) -> int:
+    40 +    parser = build_parser()
+    41 +    args = parser.parse_args(argv)
+    42 +    if args.command == "play-human":
+    43 +        return play_human_vs_human()
+    44 +    parser.error(f"unknown command: {args.command}")
+    45 +    return 2
+    46 +
+    47 +
+    48 +if __name__ == "__main__":
+    49 +    sys.exit(main())
+
+  └ connect4_zero/game.py (+245 -0)
+      1 +"""Core Connect 4 game logic.
+      2 +
+      3 +The implementation uses compact bitboards for fast win detection and ch
+         eap state
+      4 +copying during MCTS. Rows are zero-indexed from the bottom internally.
+      5 +"""
+      6 +
+      7 +from __future__ import annotations
+      8 +
+      9 +from dataclasses import dataclass
+     10 +from typing import Iterable, Sequence
+     11 +
+     12 +import numpy as np
+     13 +
+     14 +ROWS = 6
+     15 +COLS = 7
+     16 +BOARD_CELLS = ROWS * COLS
+     17 +PLAYER_ONE = 1
+     18 +PLAYER_TWO = -1
+     19 +EMPTY = 0
+     20 +FULL_COLUMN_HEIGHT = ROWS
+     21 +_SHIFTS = (1, 7, 6, 8)
+     22 +_PLAYER_SYMBOLS = {
+     23 +    PLAYER_ONE: "X",
+     24 +    PLAYER_TWO: "O",
+     25 +    EMPTY: ".",
+     26 +}
+     27 +
+     28 +
+     29 +class InvalidMoveError(ValueError):
+     30 +    """Raised when a move cannot be applied to the current state."""
+     31 +
+     32 +
+     33 +def bit_for_position(col: int, row: int) -> int:
+     34 +    """Return the bit mask for a board position."""
+     35 +
+     36 +    if not 0 <= col < COLS:
+     37 +        raise ValueError(f"column must be in [0, {COLS - 1}]")
+     38 +    if not 0 <= row < ROWS:
+     39 +        raise ValueError(f"row must be in [0, {ROWS - 1}]")
+     40 +    return 1 << (col * 7 + row)
+     41 +
+     42 +
+     43 +def _has_connect_four(bitboard: int) -> bool:
+     44 +    for shift in _SHIFTS:
+     45 +        chain = bitboard & (bitboard >> shift)
+     46 +        if chain & (chain >> (2 * shift)):
+     47 +            return True
+     48 +    return False
+     49 +
+     50 +
+     51 +def parse_move_sequence(text: str) -> list[int]:
+     52 +    """Parse a 1-indexed move history string into zero-indexed columns.
+         """
+     53 +
+     54 +    if not text:
+     55 +        return []
+     56 +    moves: list[int] = []
+     57 +    for character in text.strip():
+     58 +        if character < "1" or character > "7":
+     59 +            raise ValueError(f"invalid move character: {character!r}")
+     60 +        moves.append(int(character) - 1)
+     61 +    return moves
+     62 +
+     63 +
+     64 +@dataclass(frozen=True, slots=True)
+     65 +class Connect4State:
+     66 +    """Immutable Connect 4 position."""
+     67 +
+     68 +    player_one_bits: int = 0
+     69 +    player_two_bits: int = 0
+     70 +    heights: tuple[int, ...] = (0, 0, 0, 0, 0, 0, 0)
+     71 +    current_player: int = PLAYER_ONE
+     72 +    winner: int = EMPTY
+     73 +    move_count: int = 0
+     74 +    last_move: int | None = None
+     75 +
+     76 +    @classmethod
+     77 +    def new_game(cls) -> "Connect4State":
+     78 +        return cls()
+     79 +
+     80 +    @classmethod
+     81 +    def from_moves(cls, moves: Sequence[int]) -> "Connect4State":
+     82 +        state = cls.new_game()
+     83 +        for move in moves:
+     84 +            state = state.play(move)
+     85 +        return state
+     86 +
+     87 +    @classmethod
+     88 +    def from_history_text(cls, text: str) -> "Connect4State":
+     89 +        return cls.from_moves(parse_move_sequence(text))
+     90 +
+     91 +    def occupancy_bits(self) -> int:
+     92 +        return self.player_one_bits | self.player_two_bits
+     93 +
+     94 +    def opponent_player(self) -> int:
+     95 +        return PLAYER_TWO if self.current_player == PLAYER_ONE else PLA
+         YER_ONE
+     96 +
+     97 +    def player_bits(self, player: int) -> int:
+     98 +        if player == PLAYER_ONE:
+     99 +            return self.player_one_bits
+    100 +        if player == PLAYER_TWO:
+    101 +            return self.player_two_bits
+    102 +        raise ValueError(f"unknown player: {player}")
+    103 +
+    104 +    def is_full(self) -> bool:
+    105 +        return self.move_count >= BOARD_CELLS
+    106 +
+    107 +    def is_terminal(self) -> bool:
+    108 +        return self.winner != EMPTY or self.is_full()
+    109 +
+    110 +    def legal_moves(self) -> list[int]:
+    111 +        if self.is_terminal():
+    112 +            return []
+    113 +        return [col for col, height in enumerate(self.heights) if heigh
+         t < FULL_COLUMN_HEIGHT]
+    114 +
+    115 +    def is_legal_move(self, col: int) -> bool:
+    116 +        return 0 <= col < COLS and not self.is_terminal() and self.heig
+         hts[col] < FULL_COLUMN_HEIGHT
+    117 +
+    118 +    def piece_at(self, row: int, col: int) -> int:
+    119 +        bit = bit_for_position(col, row)
+    120 +        if self.player_one_bits & bit:
+    121 +            return PLAYER_ONE
+    122 +        if self.player_two_bits & bit:
+    123 +            return PLAYER_TWO
+    124 +        return EMPTY
+    125 +
+    126 +    def board_matrix(self) -> np.ndarray:
+    127 +        """Return an integer board matrix indexed as [row, col] from bo
+         ttom up."""
+    128 +
+    129 +        board = np.zeros((ROWS, COLS), dtype=np.int8)
+    130 +        for col in range(COLS):
+    131 +            for row in range(ROWS):
+    132 +                board[row, col] = self.piece_at(row, col)
+    133 +        return board
+    134 +
+    135 +    def encode(self, perspective_player: int | None = None) -> np.ndarr
+         ay:
+    136 +        """Encode the position into neural-network planes.
+    137 +
+    138 +        Plane 0: stones for the perspective player.
+    139 +        Plane 1: stones for the opponent.
+    140 +        Plane 2: normalized move count, broadcast to the board.
+    141 +        """
+    142 +
+    143 +        perspective = self.current_player if perspective_player is None
+          else perspective_player
+    144 +        opponent = PLAYER_TWO if perspective == PLAYER_ONE else PLAYER_
+         ONE
+    145 +        board = self.board_matrix()
+    146 +        planes = np.zeros((3, ROWS, COLS), dtype=np.float32)
+    147 +        planes[0] = (board == perspective).astype(np.float32)
+    148 +        planes[1] = (board == opponent).astype(np.float32)
+    149 +        planes[2].fill(self.move_count / BOARD_CELLS)
+    150 +        return planes
+    151 +
+    152 +    def ascii_board(self) -> str:
+    153 +        rows: list[str] = ["1 2 3 4 5 6 7"]
+    154 +        for row in range(ROWS - 1, -1, -1):
+    155 +            cells = (_PLAYER_SYMBOLS[self.piece_at(row, col)] for col i
+         n range(COLS))
+    156 +            rows.append(" ".join(cells))
+    157 +        return "\n".join(rows)
+    158 +
+    159 +    def move_sequence_text(self) -> str:
+    160 +        state_moves: list[str] = []
+    161 +        state = Connect4State.new_game()
+    162 +        # Reconstruct via column heights and last move is not sufficien
+         t. This method
+    163 +        # is intentionally unsupported for arbitrary states.
+    164 +        raise NotImplementedError("move sequence reconstruction is not
+         supported")
+    165 +
+    166 +    def result_for(self, player: int) -> float:
+    167 +        if self.winner == EMPTY:
+    168 +            if self.is_full():
+    169 +                return 0.0
+    170 +            raise ValueError("result is only defined for terminal state
+         s")
+    171 +        return 1.0 if self.winner == player else -1.0
+    172 +
+    173 +    def would_win(self, col: int, player: int | None = None) -> bool:
+    174 +        if not 0 <= col < COLS:
+    175 +            return False
+    176 +        player_to_check = self.current_player if player is None else pl
+         ayer
+    177 +        if self.heights[col] >= FULL_COLUMN_HEIGHT:
+    178 +            return False
+    179 +        row = self.heights[col]
+    180 +        bit = bit_for_position(col, row)
+    181 +        return _has_connect_four(self.player_bits(player_to_check) | bi
+         t)
+    182 +
+    183 +    def immediate_winning_moves(self, player: int | None = None) -> lis
+         t[int]:
+    184 +        player_to_check = self.current_player if player is None else pl
+         ayer
+    185 +        return [move for move in self.legal_moves() if self.would_win(m
+         ove, player_to_check)]
+    186 +
+    187 +    def play(self, col: int) -> "Connect4State":
+    188 +        if not 0 <= col < COLS:
+    189 +            raise InvalidMoveError(f"column must be between 1 and {COLS
+         }")
+    190 +        if self.is_terminal():
+    191 +            raise InvalidMoveError("cannot move in a terminal position"
+         )
+    192 +        height = self.heights[col]
+    193 +        if height >= FULL_COLUMN_HEIGHT:
+    194 +            raise InvalidMoveError(f"column {col + 1} is full")
+    195 +
+    196 +        bit = bit_for_position(col, height)
+    197 +        if self.current_player == PLAYER_ONE:
+    198 +            player_one_bits = self.player_one_bits | bit
+    199 +            player_two_bits = self.player_two_bits
+    200 +            winner = PLAYER_ONE if _has_connect_four(player_one_bits) e
+         lse EMPTY
+    201 +        else:
+    202 +            player_one_bits = self.player_one_bits
+    203 +            player_two_bits = self.player_two_bits | bit
+    204 +            winner = PLAYER_TWO if _has_connect_four(player_two_bits) e
+         lse EMPTY
+    205 +
+    206 +        new_heights = list(self.heights)
+    207 +        new_heights[col] += 1
+    208 +        return Connect4State(
+    209 +            player_one_bits=player_one_bits,
+    210 +            player_two_bits=player_two_bits,
+    211 +            heights=tuple(new_heights),
+    212 +            current_player=-self.current_player,
+    213 +            winner=winner,
+    214 +            move_count=self.move_count + 1,
+    215 +            last_move=col,
+    216 +        )
+    217 +
+    218 +    def mirrored(self) -> "Connect4State":
+    219 +        player_one_bits = 0
+    220 +        player_two_bits = 0
+    221 +        mirrored_heights = [0] * COLS
+    222 +        for col in range(COLS):
+    223 +            target_col = COLS - 1 - col
+    224 +            for row in range(self.heights[col]):
+    225 +                piece = self.piece_at(row, col)
+    226 +                bit = bit_for_position(target_col, row)
+    227 +                mirrored_heights[target_col] = max(mirrored_heights[tar
+         get_col], row + 1)
+    228 +                if piece == PLAYER_ONE:
+    229 +                    player_one_bits |= bit
+    230 +                elif piece == PLAYER_TWO:
+    231 +                    player_two_bits |= bit
+    232 +        last_move = None if self.last_move is None else COLS - 1 - self
+         .last_move
+    233 +        return Connect4State(
+    234 +            player_one_bits=player_one_bits,
+    235 +            player_two_bits=player_two_bits,
+    236 +            heights=tuple(mirrored_heights),
+    237 +            current_player=self.current_player,
+    238 +            winner=self.winner,
+    239 +            move_count=self.move_count,
+    240 +            last_move=last_move,
+    241 +        )
+    242 +
+    243 +
+    244 +def moves_to_history_text(moves: Iterable[int]) -> str:
+    245 +    return "".join(str(move + 1) for move in moves)
+
+  └ pyproject.toml (+4 -0)
+    1 +[tool.pytest.ini_options]
+    2 +testpaths = ["tests"]
+    3 +python_files = ["test_*.py"]
+    4 +
+
+  └ tests/test_game.py (+185 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import numpy as np
+      4 +import pytest
+      5 +
+      6 +from connect4_zero.game import (
+      7 +    BOARD_CELLS,
+      8 +    COLS,
+      9 +    ROWS,
+     10 +    Connect4State,
+     11 +    InvalidMoveError,
+     12 +    PLAYER_ONE,
+     13 +    PLAYER_TWO,
+     14 +    bit_for_position,
+     15 +    moves_to_history_text,
+     16 +    parse_move_sequence,
+     17 +)
+     18 +
+     19 +
+     20 +def play_moves(moves: list[int]) -> Connect4State:
+     21 +    state = Connect4State.new_game()
+     22 +    for move in moves:
+     23 +        state = state.play(move)
+     24 +    return state
+     25 +
+     26 +
+     27 +def test_new_game_is_empty() -> None:
+     28 +    state = Connect4State.new_game()
+     29 +    assert state.move_count == 0
+     30 +    assert state.current_player == PLAYER_ONE
+     31 +    assert state.legal_moves() == list(range(COLS))
+     32 +    assert state.board_matrix().sum() == 0
+     33 +    assert state.ascii_board().splitlines()[0] == "1 2 3 4 5 6 7"
+     34 +
+     35 +
+     36 +def test_bit_for_position_bounds() -> None:
+     37 +    assert bit_for_position(0, 0) == 1
+     38 +    assert bit_for_position(6, 5) == 1 << (6 * 7 + 5)
+     39 +    with pytest.raises(ValueError):
+     40 +        bit_for_position(-1, 0)
+     41 +    with pytest.raises(ValueError):
+     42 +        bit_for_position(0, 6)
+     43 +
+     44 +
+     45 +def test_parse_move_sequence() -> None:
+     46 +    assert parse_move_sequence("") == []
+     47 +    assert parse_move_sequence("1427") == [0, 3, 1, 6]
+     48 +    with pytest.raises(ValueError):
+     49 +        parse_move_sequence("08")
+     50 +
+     51 +
+     52 +def test_play_stacks_pieces_to_lowest_row() -> None:
+     53 +    state = play_moves([2, 2, 2])
+     54 +    assert state.piece_at(0, 2) == PLAYER_ONE
+     55 +    assert state.piece_at(1, 2) == PLAYER_TWO
+     56 +    assert state.piece_at(2, 2) == PLAYER_ONE
+     57 +    assert state.heights[2] == 3
+     58 +
+     59 +
+     60 +def test_invalid_column_indices_raise() -> None:
+     61 +    state = Connect4State.new_game()
+     62 +    with pytest.raises(InvalidMoveError):
+     63 +        state.play(-1)
+     64 +    with pytest.raises(InvalidMoveError):
+     65 +        state.play(7)
+     66 +
+     67 +
+     68 +def test_full_column_is_rejected() -> None:
+     69 +    state = play_moves([0, 0, 0, 0, 0, 0])
+     70 +    assert 0 not in state.legal_moves()
+     71 +    with pytest.raises(InvalidMoveError):
+     72 +        state.play(0)
+     73 +
+     74 +
+     75 +def test_horizontal_win_detection() -> None:
+     76 +    state = play_moves([0, 0, 1, 1, 2, 2, 3])
+     77 +    assert state.is_terminal()
+     78 +    assert state.winner == PLAYER_ONE
+     79 +
+     80 +
+     81 +def test_vertical_win_detection() -> None:
+     82 +    state = play_moves([0, 1, 0, 1, 0, 1, 0])
+     83 +    assert state.is_terminal()
+     84 +    assert state.winner == PLAYER_ONE
+     85 +
+     86 +
+     87 +def test_positive_slope_diagonal_win_detection() -> None:
+     88 +    state = play_moves([0, 1, 1, 2, 4, 2, 2, 3, 5, 3, 6, 3, 3])
+     89 +    assert state.is_terminal()
+     90 +    assert state.winner == PLAYER_ONE
+     91 +
+     92 +
+     93 +def test_negative_slope_diagonal_win_detection() -> None:
+     94 +    state = play_moves([3, 2, 2, 1, 5, 1, 1, 0, 6, 0, 6, 0, 0])
+     95 +    assert state.is_terminal()
+     96 +    assert state.winner == PLAYER_ONE
+     97 +
+     98 +
+     99 +def test_draw_detection_on_full_board_without_winner() -> None:
+    100 +    rows = [
+    101 +        [PLAYER_ONE, PLAYER_ONE, PLAYER_TWO, PLAYER_TWO, PLAYER_ONE, PL
+         AYER_ONE, PLAYER_TWO],
+    102 +        [PLAYER_TWO, PLAYER_TWO, PLAYER_ONE, PLAYER_ONE, PLAYER_TWO, PL
+         AYER_TWO, PLAYER_ONE],
+    103 +        [PLAYER_ONE, PLAYER_ONE, PLAYER_TWO, PLAYER_TWO, PLAYER_ONE, PL
+         AYER_ONE, PLAYER_TWO],
+    104 +        [PLAYER_TWO, PLAYER_TWO, PLAYER_ONE, PLAYER_ONE, PLAYER_TWO, PL
+         AYER_TWO, PLAYER_ONE],
+    105 +        [PLAYER_ONE, PLAYER_ONE, PLAYER_TWO, PLAYER_TWO, PLAYER_ONE, PL
+         AYER_ONE, PLAYER_TWO],
+    106 +        [PLAYER_TWO, PLAYER_TWO, PLAYER_ONE, PLAYER_ONE, PLAYER_TWO, PL
+         AYER_TWO, PLAYER_ONE],
+    107 +    ]
+    108 +    moves: list[int] = []
+    109 +    heights = [0] * COLS
+    110 +    # Fill from the bottom using the predefined pattern.
+    111 +    while len(moves) < BOARD_CELLS:
+    112 +        for col in range(COLS):
+    113 +            row = heights[col]
+    114 +            if row < ROWS:
+    115 +                target_player = rows[row][col]
+    116 +                current_player = PLAYER_ONE if len(moves) % 2 == 0 else
+          PLAYER_TWO
+    117 +                if current_player == target_player:
+    118 +                    moves.append(col)
+    119 +                    heights[col] += 1
+    120 +    state = play_moves(moves)
+    121 +    assert state.is_terminal()
+    122 +    assert state.winner == 0
+    123 +    assert state.is_full()
+    124 +    assert state.result_for(PLAYER_ONE) == 0.0
+    125 +
+    126 +
+    127 +def test_result_for_requires_terminal_state() -> None:
+    128 +    with pytest.raises(ValueError):
+    129 +        Connect4State.new_game().result_for(PLAYER_ONE)
+    130 +
+    131 +
+    132 +def test_would_win_and_immediate_wins() -> None:
+    133 +    state = play_moves([0, 4, 1, 4, 2, 5])
+    134 +    assert state.current_player == PLAYER_ONE
+    135 +    assert state.would_win(3)
+    136 +    assert state.immediate_winning_moves() == [3]
+    137 +    assert state.would_win(6, player=PLAYER_TWO) is False
+    138 +
+    139 +
+    140 +def test_terminal_state_has_no_legal_moves() -> None:
+    141 +    state = play_moves([0, 0, 1, 1, 2, 2, 3])
+    142 +    assert state.legal_moves() == []
+    143 +    with pytest.raises(InvalidMoveError):
+    144 +        state.play(4)
+    145 +
+    146 +
+    147 +def test_encoding_planes_follow_perspective() -> None:
+    148 +    state = play_moves([0, 1, 0])
+    149 +    encoded = state.encode()
+    150 +    assert encoded.shape == (3, ROWS, COLS)
+    151 +    assert encoded[0, 0, 1] == 1.0
+    152 +    assert encoded[1, 0, 0] == 1.0
+    153 +    assert encoded[2, 0, 0] == pytest.approx(3 / BOARD_CELLS)
+    154 +
+    155 +
+    156 +def test_mirroring_reflects_board_and_last_move() -> None:
+    157 +    state = play_moves([0, 6, 1, 6, 2])
+    158 +    mirrored = state.mirrored()
+    159 +    assert mirrored.last_move == 4
+    160 +    assert mirrored.piece_at(0, 6) == PLAYER_ONE
+    161 +    assert mirrored.piece_at(0, 0) == PLAYER_TWO
+    162 +    assert mirrored.piece_at(0, 5) == PLAYER_ONE
+    163 +
+    164 +
+    165 +def test_from_history_text_matches_play_sequence() -> None:
+    166 +    text = "1122334"
+    167 +    state = Connect4State.from_history_text(text)
+    168 +    expected = play_moves([0, 0, 1, 1, 2, 2, 3])
+    169 +    assert state == expected
+    170 +
+    171 +
+    172 +def test_moves_to_history_text_round_trip() -> None:
+    173 +    moves = [0, 6, 3, 3, 1]
+    174 +    assert moves_to_history_text(moves) == "17442"
+    175 +    assert parse_move_sequence(moves_to_history_text(moves)) == moves
+    176 +
+    177 +
+    178 +def test_board_matrix_uses_bottom_up_rows() -> None:
+    179 +    state = play_moves([0, 1, 0])
+    180 +    board = state.board_matrix()
+    181 +    expected = np.zeros((ROWS, COLS), dtype=np.int8)
+    182 +    expected[0, 0] = PLAYER_ONE
+    183 +    expected[1, 0] = PLAYER_ONE
+    184 +    expected[0, 1] = PLAYER_TWO
+    185 +    assert np.array_equal(board, expected)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The core engine and rule tests are in place. I’m running the first test pass
+  now to shake out any mistakes before I build MCTS and training on top of it.
+
+• Ran pytest -q
+  └
+    ==================================== ERRORS
+    … +16 lines
+    collection !!!!!!!!!!!!!!!!!!!!
+    1 error in 0.12s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• pytest isn’t seeing the local package on the import path. I’m fixing the test
+  harness rather than working around it ad hoc, then rerunning the rule suite.
+
+• Added tests/conftest.py (+8 -0)
+    1 +from __future__ import annotations
+    2 +
+    3 +import sys
+    4 +from pathlib import Path
+    5 +
+    6 +ROOT = Path(__file__).resolve().parents[1]
+    7 +if str(ROOT) not in sys.path:
+    8 +    sys.path.insert(0, str(ROOT))
+
+• Ran pytest -q
+  └ ...................
+    [100%]
+    19 passed in 0.08s
+
+─ Worked for 3m 06s ────────────────────────────────────────────────────────────
+
+• The next patch is the large one: network, replay buffer, MCTS, trainer, and
+  the expanded CLI. I’m keeping the interfaces narrow so the later tests can
+  exercise behavior without needing full training runs for every case.
+
+• Edited 6 files (+1097 -0)
+  └ connect4_zero/__main__.py (+5 -0)
+    1 +from .cli import main
+    2 +
+    3 +
+    4 +if __name__ == "__main__":
+    5 +    raise SystemExit(main())
+
+  └ connect4_zero/cli.py (+135 -0)
+      5  import argparse
+      6 +from datetime import datetime
+      7 +import os
+      8  import sys
+      9
+     10 +import numpy as np
+     11 +
+     12  from .game import Connect4State, InvalidMoveError, PLAYER_ONE
+     13 +from .mcts import MCTSConfig
+     14 +from .network import NetworkConfig
+     15 +from .training import (
+     16 +    AlphaZeroTrainer,
+     17 +    TrainingConfig,
+     18 +    infer_move_from_history,
+     19 +    load_model_for_inference,
+     20 +    parse_deadline_file,
+     21 +    read_history_file,
+     22 +    write_move_file,
+     23 +    choose_model_move,
+     24 +)
+     25
+        ⋮
+     51      subparsers.add_parser("play-human", help="Play a human vs human gam
+         e in the terminal")
+     52 +    train_parser = subparsers.add_parser("train", help="Run AlphaZero-s
+         tyle self-play training")
+     53 +    train_parser.add_argument("--iterations", type=int, default=20)
+     54 +    train_parser.add_argument("--resume", default=None)
+     55 +    train_parser.add_argument("--deadline-file", default=None)
+     56 +    train_parser.add_argument("--self-play-games", type=int, default=24
+         )
+     57 +    train_parser.add_argument("--simulations", type=int, default=192)
+     58 +    train_parser.add_argument("--training-steps", type=int, default=96)
+     59 +    train_parser.add_argument("--batch-size", type=int, default=256)
+     60 +    train_parser.add_argument("--device", default="auto")
+     61 +    train_parser.add_argument("--seed", type=int, default=1234)
+     62 +    train_parser.add_argument("--checkpoint-dir", default="artifacts")
+     63 +
+     64 +    model_parser = subparsers.add_parser("play-model", help="Play again
+         st the trained model")
+     65 +    model_parser.add_argument("--checkpoint", default="artifacts/best.p
+         t")
+     66 +    first_group = model_parser.add_mutually_exclusive_group()
+     67 +    first_group.add_argument("--human-first", action="store_true")
+     68 +    first_group.add_argument("--human-second", action="store_true")
+     69 +    model_parser.add_argument("--simulations", type=int, default=320)
+     70 +    model_parser.add_argument("--device", default="auto")
+     71 +
+     72 +    infer_parser = subparsers.add_parser("infer-move", help="Choose a m
+         ove from game_state.txt")
+     73 +    infer_parser.add_argument("--checkpoint", default="artifacts/best.p
+         t")
+     74 +    infer_parser.add_argument("--input", default="game_state.txt")
+     75 +    infer_parser.add_argument("--output", default="next_move.txt")
+     76 +    infer_parser.add_argument("--simulations", type=int, default=800)
+     77 +    infer_parser.add_argument("--device", default="auto")
+     78      return parser
+        ⋮
+     85          return play_human_vs_human()
+     86 +    if args.command == "train":
+     87 +        training_config = TrainingConfig(
+     88 +            seed=args.seed,
+     89 +            device=args.device,
+     90 +            iterations=args.iterations,
+     91 +            self_play_games_per_iteration=args.self_play_games,
+     92 +            training_steps_per_iteration=args.training_steps,
+     93 +            batch_size=args.batch_size,
+     94 +            log_csv_path=os.path.join(args.checkpoint_dir, "training_lo
+         g.csv"),
+     95 +            latest_checkpoint_path=os.path.join(args.checkpoint_dir, "l
+         atest.pt"),
+     96 +            best_checkpoint_path=os.path.join(args.checkpoint_dir, "bes
+         t.pt"),
+     97 +        )
+     98 +        trainer = AlphaZeroTrainer(
+     99 +            training_config=training_config,
+    100 +            network_config=NetworkConfig(),
+    101 +            mcts_config=MCTSConfig(simulations=args.simulations),
+    102 +        )
+    103 +        if args.resume:
+    104 +            trainer.load_checkpoint(args.resume)
+    105 +        deadline = None
+    106 +        if args.deadline_file:
+    107 +            _, deadline = parse_deadline_file(args.deadline_file)
+    108 +            print(f"Training until reserve before deadline at {deadline
+         .isoformat()}")
+    109 +        trainer.run(deadline=deadline)
+    110 +        return 0
+    111 +    if args.command == "play-model":
+    112 +        return play_against_model(
+    113 +            checkpoint_path=args.checkpoint,
+    114 +            human_first=not args.human_second,
+    115 +            simulations=args.simulations,
+    116 +            device=args.device,
+    117 +        )
+    118 +    if args.command == "infer-move":
+    119 +        history_text = read_history_file(args.input)
+    120 +        move_text, _ = infer_move_from_history(
+    121 +            history_text,
+    122 +            args.checkpoint,
+    123 +            simulations=args.simulations,
+    124 +            device=args.device,
+    125 +        )
+    126 +        write_move_file(args.output, move_text)
+    127 +        return 0
+    128      parser.error(f"unknown command: {args.command}")
+        ⋮
+    131
+    132 +def play_against_model(
+    133 +    *,
+    134 +    checkpoint_path: str,
+    135 +    human_first: bool,
+    136 +    simulations: int,
+    137 +    device: str,
+    138 +) -> int:
+    139 +    model, resolved_device = load_model_for_inference(checkpoint_path,
+         device=device)
+    140 +    rng = np.random.default_rng(0)
+    141 +    human_player = PLAYER_ONE if human_first else -PLAYER_ONE
+    142 +    state = Connect4State.new_game()
+    143 +    while True:
+    144 +        print(state.ascii_board())
+    145 +        if state.is_terminal():
+    146 +            if state.winner == 0:
+    147 +                print("Game over: draw.")
+    148 +            elif state.winner == human_player:
+    149 +                print("Game over: human wins.")
+    150 +            else:
+    151 +                print("Game over: model wins.")
+    152 +            return 0
+    153 +
+    154 +        if state.current_player == human_player:
+    155 +            response = input("Choose a column (1-7): ").strip()
+    156 +            try:
+    157 +                state = state.play(int(response) - 1)
+    158 +            except (ValueError, InvalidMoveError):
+    159 +                print("Invalid move. Choose a non-full column from 1 to
+          7.")
+    160 +            continue
+    161 +
+    162 +        summary = choose_model_move(
+    163 +            model,
+    164 +            state,
+    165 +            device=resolved_device,
+    166 +            simulations=simulations,
+    167 +            rng=rng,
+    168 +        )
+    169 +        top_lines = [
+    170 +            f"col {move + 1}: visits={visits}, prob={prob:.3f}"
+    171 +            for move, visits, prob in summary.top_moves
+    172 +            if visits > 0 or prob > 0
+    173 +        ]
+    174 +        win_probability = (summary.root_value + 1.0) / 2.0
+    175 +        print("Model search:")
+    176 +        for line in top_lines:
+    177 +            print(f"  {line}")
+    178 +        print(f"  root win probability: {win_probability:.3f}")
+    179 +        print(f"Model plays column {summary.selected_move + 1}")
+    180 +        state = state.play(summary.selected_move)
+    181 +
+    182 +
+    183  if __name__ == "__main__":
+
+  └ connect4_zero/mcts.py (+237 -0)
+      1 +"""Monte Carlo Tree Search for Connect 4."""
+      2 +
+      3 +from __future__ import annotations
+      4 +
+      5 +from dataclasses import dataclass, field
+      6 +import math
+      7 +from typing import Protocol
+      8 +
+      9 +import numpy as np
+     10 +
+     11 +from .game import COLS, Connect4State
+     12 +
+     13 +_CENTER_OUT_MOVE_ORDER = (3, 2, 4, 1, 5, 0, 6)
+     14 +
+     15 +
+     16 +class Evaluator(Protocol):
+     17 +    def evaluate(self, state: Connect4State) -> tuple[np.ndarray, float
+         ]:
+     18 +        """Return policy priors for columns and a value for the side to
+          move."""
+     19 +
+     20 +
+     21 +@dataclass(frozen=True, slots=True)
+     22 +class MCTSConfig:
+     23 +    simulations: int = 192
+     24 +    c_puct: float = 1.6
+     25 +    dirichlet_alpha: float = 0.3
+     26 +    dirichlet_epsilon: float = 0.25
+     27 +    tactical_pruning: bool = True
+     28 +
+     29 +
+     30 +@dataclass(slots=True)
+     31 +class SearchSummary:
+     32 +    selected_move: int
+     33 +    visit_counts: np.ndarray
+     34 +    action_probs: np.ndarray
+     35 +    root_value: float
+     36 +    root_visit_count: int
+     37 +    most_visited_move: int
+     38 +    top_moves: list[tuple[int, int, float]]
+     39 +
+     40 +
+     41 +@dataclass(slots=True)
+     42 +class Node:
+     43 +    state: Connect4State
+     44 +    priors: np.ndarray = field(default_factory=lambda: np.zeros((COLS,)
+         , dtype=np.float32))
+     45 +    children: dict[int, "Node"] = field(default_factory=dict)
+     46 +    visit_count: int = 0
+     47 +    value_sum: float = 0.0
+     48 +    expanded: bool = False
+     49 +
+     50 +    @property
+     51 +    def value_mean(self) -> float:
+     52 +        if self.visit_count == 0:
+     53 +            return 0.0
+     54 +        return self.value_sum / self.visit_count
+     55 +
+     56 +
+     57 +class MCTS:
+     58 +    def __init__(
+     59 +        self,
+     60 +        evaluator: Evaluator,
+     61 +        config: MCTSConfig | None = None,
+     62 +        rng: np.random.Generator | None = None,
+     63 +    ) -> None:
+     64 +        self.evaluator = evaluator
+     65 +        self.config = config or MCTSConfig()
+     66 +        self.rng = rng or np.random.default_rng()
+     67 +        self._node_cache: dict[Connect4State, Node] = {}
+     68 +
+     69 +    def clear(self) -> None:
+     70 +        self._node_cache.clear()
+     71 +
+     72 +    def search(
+     73 +        self,
+     74 +        state: Connect4State,
+     75 +        *,
+     76 +        add_exploration_noise: bool = False,
+     77 +        temperature: float = 0.0,
+     78 +    ) -> SearchSummary:
+     79 +        root = self._get_or_create_node(state)
+     80 +        if not root.expanded:
+     81 +            self._expand(root)
+     82 +        if add_exploration_noise:
+     83 +            self._add_dirichlet_noise(root)
+     84 +        for _ in range(self.config.simulations):
+     85 +            self._run_simulation(root)
+     86 +
+     87 +        visit_counts = np.zeros((COLS,), dtype=np.int32)
+     88 +        for move in state.legal_moves():
+     89 +            child = root.children.get(move)
+     90 +            visit_counts[move] = 0 if child is None else child.visit_co
+         unt
+     91 +        action_probs = self._visit_distribution(visit_counts, temperatu
+         re=temperature)
+     92 +        selected_move = self._select_final_move(visit_counts, temperatu
+         re=temperature)
+     93 +        most_visited_move = int(np.argmax(visit_counts))
+     94 +        top_moves = self._top_moves(visit_counts, action_probs)
+     95 +        return SearchSummary(
+     96 +            selected_move=selected_move,
+     97 +            visit_counts=visit_counts,
+     98 +            action_probs=action_probs,
+     99 +            root_value=root.value_mean,
+    100 +            root_visit_count=root.visit_count,
+    101 +            most_visited_move=most_visited_move,
+    102 +            top_moves=top_moves,
+    103 +        )
+    104 +
+    105 +    def _run_simulation(self, root: Node) -> None:
+    106 +        node = root
+    107 +        path = [node]
+    108 +        while node.expanded and not node.state.is_terminal():
+    109 +            move = self._select_child_move(node)
+    110 +            child = node.children.get(move)
+    111 +            if child is None:
+    112 +                child_state = node.state.play(move)
+    113 +                child = self._get_or_create_node(child_state)
+    114 +                node.children[move] = child
+    115 +            node = child
+    116 +            path.append(node)
+    117 +            if not node.expanded:
+    118 +                break
+    119 +
+    120 +        if node.state.is_terminal():
+    121 +            value = node.state.result_for(node.state.current_player)
+    122 +        else:
+    123 +            value = self._expand(node)
+    124 +
+    125 +        for backprop_node in reversed(path):
+    126 +            backprop_node.visit_count += 1
+    127 +            backprop_node.value_sum += value
+    128 +            value = -value
+    129 +
+    130 +    def _expand(self, node: Node) -> float:
+    131 +        if node.state.is_terminal():
+    132 +            node.expanded = True
+    133 +            node.priors.fill(0.0)
+    134 +            return node.state.result_for(node.state.current_player)
+    135 +
+    136 +        priors, value = self.evaluator.evaluate(node.state)
+    137 +        legal_moves = node.state.legal_moves()
+    138 +        allowed_moves = self._allowed_moves(node.state, legal_moves)
+    139 +        masked_priors = np.zeros((COLS,), dtype=np.float32)
+    140 +        masked_priors[allowed_moves] = priors[allowed_moves]
+    141 +        if masked_priors.sum() <= 0:
+    142 +            masked_priors[allowed_moves] = 1.0 / len(allowed_moves)
+    143 +        else:
+    144 +            masked_priors /= masked_priors.sum()
+    145 +        node.priors = masked_priors
+    146 +        node.expanded = True
+    147 +        return value
+    148 +
+    149 +    def _allowed_moves(self, state: Connect4State, legal_moves: list[in
+         t]) -> list[int]:
+    150 +        if not self.config.tactical_pruning:
+    151 +            return legal_moves
+    152 +        winning_moves = state.immediate_winning_moves()
+    153 +        if winning_moves:
+    154 +            return winning_moves
+    155 +
+    156 +        safe_moves: list[int] = []
+    157 +        for move in legal_moves:
+    158 +            next_state = state.play(move)
+    159 +            if not next_state.immediate_winning_moves():
+    160 +                safe_moves.append(move)
+    161 +        return safe_moves or legal_moves
+    162 +
+    163 +    def _select_child_move(self, node: Node) -> int:
+    164 +        best_score = -float("inf")
+    165 +        best_move = -1
+    166 +        sqrt_visits = math.sqrt(max(node.visit_count, 1))
+    167 +        for move in _CENTER_OUT_MOVE_ORDER:
+    168 +            if move not in node.state.legal_moves():
+    169 +                continue
+    170 +            prior = float(node.priors[move])
+    171 +            child = node.children.get(move)
+    172 +            child_visits = 0 if child is None else child.visit_count
+    173 +            child_value = 0.0 if child is None or child.visit_count ==
+         0 else -child.value_mean
+    174 +            exploration = self.config.c_puct * prior * sqrt_visits / (1
+          + child_visits)
+    175 +            score = child_value + exploration
+    176 +            if score > best_score:
+    177 +                best_score = score
+    178 +                best_move = move
+    179 +        if best_move < 0:
+    180 +            raise RuntimeError("no move selected from non-terminal node
+         ")
+    181 +        return best_move
+    182 +
+    183 +    def _add_dirichlet_noise(self, root: Node) -> None:
+    184 +        legal_moves = root.state.legal_moves()
+    185 +        if not legal_moves:
+    186 +            return
+    187 +        noise = self.rng.dirichlet([self.config.dirichlet_alpha] * len(
+         legal_moves)).astype(np.float32)
+    188 +        new_priors = root.priors.copy()
+    189 +        for move, sample in zip(legal_moves, noise, strict=True):
+    190 +            new_priors[move] = (
+    191 +                (1.0 - self.config.dirichlet_epsilon) * root.priors[mov
+         e]
+    192 +                + self.config.dirichlet_epsilon * sample
+    193 +            )
+    194 +        if new_priors.sum() > 0:
+    195 +            new_priors /= new_priors.sum()
+    196 +        root.priors = new_priors
+    197 +
+    198 +    def _visit_distribution(self, visit_counts: np.ndarray, temperature
+         : float) -> np.ndarray:
+    199 +        distribution = np.zeros((COLS,), dtype=np.float32)
+    200 +        total_visits = visit_counts.sum()
+    201 +        if total_visits <= 0:
+    202 +            return distribution
+    203 +        if temperature <= 1e-6:
+    204 +            distribution[int(np.argmax(visit_counts))] = 1.0
+    205 +            return distribution
+    206 +        scaled = np.power(np.maximum(visit_counts, 1e-6), 1.0 / tempera
+         ture, dtype=np.float64)
+    207 +        scaled_sum = scaled.sum()
+    208 +        if scaled_sum <= 0:
+    209 +            distribution[int(np.argmax(visit_counts))] = 1.0
+    210 +        else:
+    211 +            distribution = (scaled / scaled_sum).astype(np.float32)
+    212 +        return distribution
+    213 +
+    214 +    def _select_final_move(self, visit_counts: np.ndarray, temperature:
+          float) -> int:
+    215 +        if temperature <= 1e-6:
+    216 +            max_visits = int(visit_counts.max())
+    217 +            for move in _CENTER_OUT_MOVE_ORDER:
+    218 +                if visit_counts[move] == max_visits:
+    219 +                    return move
+    220 +            return int(np.argmax(visit_counts))
+    221 +        distribution = self._visit_distribution(visit_counts, temperatu
+         re=temperature)
+    222 +        return int(self.rng.choice(np.arange(COLS), p=distribution))
+    223 +
+    224 +    def _top_moves(self, visit_counts: np.ndarray, action_probs: np.nda
+         rray) -> list[tuple[int, int, float]]:
+    225 +        ordered_moves = sorted(
+    226 +            ((move, int(visit_counts[move]), float(action_probs[move]))
+          for move in range(COLS)),
+    227 +            key=lambda item: (item[1], item[2], -abs(3 - item[0])),
+    228 +            reverse=True,
+    229 +        )
+    230 +        return ordered_moves[:3]
+    231 +
+    232 +    def _get_or_create_node(self, state: Connect4State) -> Node:
+    233 +        node = self._node_cache.get(state)
+    234 +        if node is None:
+    235 +            node = Node(state=state)
+    236 +            self._node_cache[state] = node
+    237 +        return node
+
+  └ connect4_zero/network.py (+88 -0)
+     1 +"""Neural network architecture for AlphaZero-style Connect 4."""
+     2 +
+     3 +from __future__ import annotations
+     4 +
+     5 +from dataclasses import asdict, dataclass
+     6 +
+     7 +import torch
+     8 +from torch import nn
+     9 +
+    10 +from .game import COLS, ROWS
+    11 +
+    12 +
+    13 +@dataclass(frozen=True, slots=True)
+    14 +class NetworkConfig:
+    15 +    input_channels: int = 3
+    16 +    channels: int = 64
+    17 +    residual_blocks: int = 6
+    18 +    policy_channels: int = 32
+    19 +    value_channels: int = 32
+    20 +    value_hidden: int = 128
+    21 +
+    22 +    def to_dict(self) -> dict[str, int]:
+    23 +        return asdict(self)
+    24 +
+    25 +
+    26 +class ResidualBlock(nn.Module):
+    27 +    def __init__(self, channels: int) -> None:
+    28 +        super().__init__()
+    29 +        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, paddin
+        g=1, bias=False)
+    30 +        self.bn1 = nn.BatchNorm2d(channels)
+    31 +        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, paddin
+        g=1, bias=False)
+    32 +        self.bn2 = nn.BatchNorm2d(channels)
+    33 +        self.activation = nn.ReLU(inplace=True)
+    34 +
+    35 +    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    36 +        residual = x
+    37 +        out = self.conv1(x)
+    38 +        out = self.bn1(out)
+    39 +        out = self.activation(out)
+    40 +        out = self.conv2(out)
+    41 +        out = self.bn2(out)
+    42 +        out = out + residual
+    43 +        return self.activation(out)
+    44 +
+    45 +
+    46 +class Connect4Net(nn.Module):
+    47 +    def __init__(self, config: NetworkConfig | None = None) -> None:
+    48 +        super().__init__()
+    49 +        self.config = config or NetworkConfig()
+    50 +        channels = self.config.channels
+    51 +        self.stem = nn.Sequential(
+    52 +            nn.Conv2d(self.config.input_channels, channels, kernel_size=
+        3, padding=1, bias=False),
+    53 +            nn.BatchNorm2d(channels),
+    54 +            nn.ReLU(inplace=True),
+    55 +        )
+    56 +        self.backbone = nn.Sequential(*(ResidualBlock(channels) for _ in
+         range(self.config.residual_blocks)))
+    57 +        self.policy_head = nn.Sequential(
+    58 +            nn.Conv2d(channels, self.config.policy_channels, kernel_size
+        =1, bias=False),
+    59 +            nn.BatchNorm2d(self.config.policy_channels),
+    60 +            nn.ReLU(inplace=True),
+    61 +            nn.Flatten(),
+    62 +            nn.Linear(self.config.policy_channels * ROWS * COLS, COLS),
+    63 +        )
+    64 +        self.value_head = nn.Sequential(
+    65 +            nn.Conv2d(channels, self.config.value_channels, kernel_size=
+        1, bias=False),
+    66 +            nn.BatchNorm2d(self.config.value_channels),
+    67 +            nn.ReLU(inplace=True),
+    68 +            nn.Flatten(),
+    69 +            nn.Linear(self.config.value_channels * ROWS * COLS, self.con
+        fig.value_hidden),
+    70 +            nn.ReLU(inplace=True),
+    71 +            nn.Linear(self.config.value_hidden, 1),
+    72 +            nn.Tanh(),
+    73 +        )
+    74 +        self._initialize()
+    75 +
+    76 +    def _initialize(self) -> None:
+    77 +        for module in self.modules():
+    78 +            if isinstance(module, nn.Conv2d | nn.Linear):
+    79 +                nn.init.kaiming_normal_(module.weight, nonlinearity="rel
+        u")
+    80 +                if getattr(module, "bias", None) is not None:
+    81 +                    nn.init.zeros_(module.bias)
+    82 +
+    83 +    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tens
+        or]:
+    84 +        features = self.stem(x)
+    85 +        features = self.backbone(features)
+    86 +        policy_logits = self.policy_head(features)
+    87 +        value = self.value_head(features).squeeze(-1)
+    88 +        return policy_logits, value
+
+  └ connect4_zero/replay.py (+100 -0)
+      1 +"""Replay buffer for self-play training examples."""
+      2 +
+      3 +from __future__ import annotations
+      4 +
+      5 +from dataclasses import dataclass
+      6 +
+      7 +import numpy as np
+      8 +
+      9 +from .game import COLS, ROWS
+     10 +
+     11 +
+     12 +@dataclass(slots=True)
+     13 +class ReplayBatch:
+     14 +    states: np.ndarray
+     15 +    policies: np.ndarray
+     16 +    values: np.ndarray
+     17 +
+     18 +
+     19 +class ReplayBuffer:
+     20 +    """Fixed-capacity ring buffer backed by NumPy arrays.
+     21 +
+     22 +    The arrays are kept contiguous to make checkpointing predictable an
+         d to avoid
+     23 +    per-example Python object overhead.
+     24 +    """
+     25 +
+     26 +    def __init__(self, capacity: int) -> None:
+     27 +        if capacity <= 0:
+     28 +            raise ValueError("capacity must be positive")
+     29 +        self.capacity = capacity
+     30 +        self.states = np.zeros((capacity, 3, ROWS, COLS), dtype=np.floa
+         t16)
+     31 +        self.policies = np.zeros((capacity, COLS), dtype=np.float32)
+     32 +        self.values = np.zeros((capacity,), dtype=np.float32)
+     33 +        self.size = 0
+     34 +        self.position = 0
+     35 +        self.total_added = 0
+     36 +        self.total_evicted = 0
+     37 +        self.last_evicted = 0
+     38 +
+     39 +    def __len__(self) -> int:
+     40 +        return self.size
+     41 +
+     42 +    def add_examples(self, states: np.ndarray, policies: np.ndarray, va
+         lues: np.ndarray) -> None:
+     43 +        if len(states) != len(policies) or len(states) != len(values):
+     44 +            raise ValueError("states, policies, and values must have th
+         e same length")
+     45 +        count = len(states)
+     46 +        if count == 0:
+     47 +            self.last_evicted = 0
+     48 +            return
+     49 +
+     50 +        size_before = self.size
+     51 +        evicted = max(0, size_before + count - self.capacity)
+     52 +        self.last_evicted = evicted
+     53 +        self.total_evicted += evicted
+     54 +        for state, policy, value in zip(states, policies, values, stric
+         t=True):
+     55 +            self.states[self.position] = state.astype(np.float16, copy=
+         False)
+     56 +            self.policies[self.position] = policy.astype(np.float32, co
+         py=False)
+     57 +            self.values[self.position] = np.float32(value)
+     58 +            self.position = (self.position + 1) % self.capacity
+     59 +            self.size = min(self.size + 1, self.capacity)
+     60 +            self.total_added += 1
+     61 +
+     62 +    def sample(self, batch_size: int, rng: np.random.Generator) -> Repl
+         ayBatch:
+     63 +        if self.size == 0:
+     64 +            raise ValueError("cannot sample from an empty replay buffer
+         ")
+     65 +        indices = rng.integers(0, self.size, size=batch_size)
+     66 +        return ReplayBatch(
+     67 +            states=self.states[indices].astype(np.float32, copy=False),
+     68 +            policies=self.policies[indices].astype(np.float32, copy=Fal
+         se),
+     69 +            values=self.values[indices].astype(np.float32, copy=False),
+     70 +        )
+     71 +
+     72 +    def turnover_rate(self) -> float:
+     73 +        denominator = min(max(self.size, 1), self.capacity)
+     74 +        return self.last_evicted / denominator
+     75 +
+     76 +    def state_dict(self) -> dict[str, object]:
+     77 +        return {
+     78 +            "capacity": self.capacity,
+     79 +            "states": self.states.copy(),
+     80 +            "policies": self.policies.copy(),
+     81 +            "values": self.values.copy(),
+     82 +            "size": self.size,
+     83 +            "position": self.position,
+     84 +            "total_added": self.total_added,
+     85 +            "total_evicted": self.total_evicted,
+     86 +            "last_evicted": self.last_evicted,
+     87 +        }
+     88 +
+     89 +    @classmethod
+     90 +    def from_state_dict(cls, state_dict: dict[str, object]) -> "ReplayB
+         uffer":
+     91 +        buffer = cls(capacity=int(state_dict["capacity"]))
+     92 +        buffer.states = np.array(state_dict["states"], dtype=np.float16
+         , copy=True)
+     93 +        buffer.policies = np.array(state_dict["policies"], dtype=np.flo
+         at32, copy=True)
+     94 +        buffer.values = np.array(state_dict["values"], dtype=np.float32
+         , copy=True)
+     95 +        buffer.size = int(state_dict["size"])
+     96 +        buffer.position = int(state_dict["position"])
+     97 +        buffer.total_added = int(state_dict["total_added"])
+     98 +        buffer.total_evicted = int(state_dict["total_evicted"])
+     99 +        buffer.last_evicted = int(state_dict["last_evicted"])
+    100 +        return buffer
+
+  └ connect4_zero/training.py (+532 -0)
+      1 +"""Training pipeline, checkpointing, and model-driven play utilities.""
+         "
+      2 +
+      3 +from __future__ import annotations
+      4 +
+      5 +from dataclasses import asdict, dataclass
+      6 +from datetime import datetime, timedelta
+      7 +import csv
+      8 +import os
+      9 +import random
+     10 +import re
+     11 +import signal
+     12 +import time
+     13 +from typing import Any
+     14 +from zoneinfo import ZoneInfo
+     15 +
+     16 +import numpy as np
+     17 +import torch
+     18 +from torch.optim import AdamW
+     19 +from torch.optim.lr_scheduler import ReduceLROnPlateau
+     20 +
+     21 +from .game import COLS, Connect4State, PLAYER_ONE, PLAYER_TWO, parse_mo
+         ve_sequence
+     22 +from .mcts import MCTS, MCTSConfig, SearchSummary
+     23 +from .network import Connect4Net, NetworkConfig
+     24 +from .replay import ReplayBatch, ReplayBuffer
+     25 +
+     26 +
+     27 +@dataclass(frozen=True, slots=True)
+     28 +class TrainingConfig:
+     29 +    seed: int = 1234
+     30 +    device: str = "cuda"
+     31 +    replay_capacity: int = 100_000
+     32 +    min_replay_to_train: int = 256
+     33 +    self_play_games_per_iteration: int = 24
+     34 +    self_play_temperature_moves: int = 10
+     35 +    self_play_temperature: float = 1.0
+     36 +    training_steps_per_iteration: int = 96
+     37 +    batch_size: int = 256
+     38 +    learning_rate: float = 1e-3
+     39 +    weight_decay: float = 1e-4
+     40 +    value_loss_weight: float = 1.0
+     41 +    iterations: int = 20
+     42 +    log_csv_path: str = "artifacts/training_log.csv"
+     43 +    latest_checkpoint_path: str = "artifacts/latest.pt"
+     44 +    best_checkpoint_path: str = "artifacts/best.pt"
+     45 +    reserve_seconds_before_deadline: int = 120
+     46 +    mirror_augmentation: bool = True
+     47 +
+     48 +    def resolved_device(self) -> str:
+     49 +        if self.device == "auto":
+     50 +            return "cuda" if torch.cuda.is_available() else "cpu"
+     51 +        if self.device == "cuda" and not torch.cuda.is_available():
+     52 +            return "cpu"
+     53 +        return self.device
+     54 +
+     55 +    def to_dict(self) -> dict[str, Any]:
+     56 +        return asdict(self)
+     57 +
+     58 +
+     59 +@dataclass(slots=True)
+     60 +class SelfPlaySummary:
+     61 +    x_win_rate: float
+     62 +    o_win_rate: float
+     63 +    draw_rate: float
+     64 +    average_game_length: float
+     65 +    replay_buffer_size: int
+     66 +    turnover_rate: float
+     67 +    positions_added: int
+     68 +    root_most_visited_move: int
+     69 +    root_visit_count: float
+     70 +    root_value_estimate: float
+     71 +    avg_policy_entropy: float
+     72 +
+     73 +
+     74 +@dataclass(slots=True)
+     75 +class TrainSummary:
+     76 +    total_loss: float
+     77 +    policy_loss: float
+     78 +    value_loss: float
+     79 +    learning_rate: float
+     80 +
+     81 +
+     82 +class CSVMetricLogger:
+     83 +    def __init__(self, path: str) -> None:
+     84 +        self.path = path
+     85 +        directory = os.path.dirname(path)
+     86 +        if directory:
+     87 +            os.makedirs(directory, exist_ok=True)
+     88 +
+     89 +    def log(self, row: dict[str, Any]) -> None:
+     90 +        fieldnames = list(row.keys())
+     91 +        write_header = not os.path.exists(self.path) or os.path.getsize
+         (self.path) == 0
+     92 +        with open(self.path, "a", newline="", encoding="utf-8") as hand
+         le:
+     93 +            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+     94 +            if write_header:
+     95 +                writer.writeheader()
+     96 +            writer.writerow(row)
+     97 +
+     98 +
+     99 +class NeuralNetEvaluator:
+    100 +    def __init__(self, model: Connect4Net, device: str) -> None:
+    101 +        self.model = model
+    102 +        self.device = device
+    103 +        self.cache: dict[Connect4State, tuple[np.ndarray, float]] = {}
+    104 +
+    105 +    def clear_cache(self) -> None:
+    106 +        self.cache.clear()
+    107 +
+    108 +    def evaluate(self, state: Connect4State) -> tuple[np.ndarray, float
+         ]:
+    109 +        cached = self.cache.get(state)
+    110 +        if cached is not None:
+    111 +            return cached
+    112 +        encoded = torch.from_numpy(state.encode()).unsqueeze(0).to(self
+         .device)
+    113 +        with torch.no_grad():
+    114 +            policy_logits, value = self.model(encoded)
+    115 +            priors = torch.softmax(policy_logits, dim=1)[0].detach().cp
+         u().numpy().astype(np.float32)
+    116 +            scalar_value = float(value.item())
+    117 +        result = (priors, scalar_value)
+    118 +        self.cache[state] = result
+    119 +        return result
+    120 +
+    121 +
+    122 +def mirror_policy(policy: np.ndarray) -> np.ndarray:
+    123 +    return np.ascontiguousarray(policy[::-1], dtype=np.float32)
+    124 +
+    125 +
+    126 +def parse_deadline_file(path: str) -> tuple[datetime, datetime]:
+    127 +    with open(path, "r", encoding="utf-8") as handle:
+    128 +        contents = handle.read()
+    129 +    matches = dict(re.findall(r"^(Start time|End time):\s+(.+)$", conte
+         nts, flags=re.MULTILINE))
+    130 +    if "Start time" not in matches or "End time" not in matches:
+    131 +        raise ValueError(f"deadline file {path!r} is missing Start time
+          or End time")
+    132 +    timezone = ZoneInfo("America/Chicago")
+    133 +    return (_parse_deadline_timestamp(matches["Start time"], timezone),
+          _parse_deadline_timestamp(matches["End time"], timezone))
+    134 +
+    135 +
+    136 +def _parse_deadline_timestamp(text: str, timezone: ZoneInfo) -> datetim
+         e:
+    137 +    parts = text.split()
+    138 +    if len(parts) < 6:
+    139 +        raise ValueError(f"invalid deadline timestamp: {text!r}")
+    140 +    # Drop the timezone abbreviation and let the named zone provide the
+          offset.
+    141 +    normalized = " ".join(parts[:4] + parts[5:])
+    142 +    return datetime.strptime(normalized, "%a %b %d %H:%M:%S %Y").replac
+         e(tzinfo=timezone)
+    143 +
+    144 +
+    145 +def load_checkpoint_bundle(path: str, device: str | None = None) -> dic
+         t[str, Any]:
+    146 +    map_location = device if device is not None else "cpu"
+    147 +    return torch.load(path, map_location=map_location, weights_only=Fal
+         se)
+    148 +
+    149 +
+    150 +class AlphaZeroTrainer:
+    151 +    def __init__(
+    152 +        self,
+    153 +        *,
+    154 +        training_config: TrainingConfig | None = None,
+    155 +        network_config: NetworkConfig | None = None,
+    156 +        mcts_config: MCTSConfig | None = None,
+    157 +    ) -> None:
+    158 +        self.training_config = training_config or TrainingConfig()
+    159 +        self.network_config = network_config or NetworkConfig()
+    160 +        self.mcts_config = mcts_config or MCTSConfig()
+    161 +        self.device = self.training_config.resolved_device()
+    162 +        self.rng = np.random.default_rng(self.training_config.seed)
+    163 +        random.seed(self.training_config.seed)
+    164 +        np.random.seed(self.training_config.seed)
+    165 +        torch.manual_seed(self.training_config.seed)
+    166 +        if torch.cuda.is_available():
+    167 +            torch.cuda.manual_seed_all(self.training_config.seed)
+    168 +
+    169 +        self.model = Connect4Net(self.network_config).to(self.device)
+    170 +        self.optimizer = AdamW(
+    171 +            self.model.parameters(),
+    172 +            lr=self.training_config.learning_rate,
+    173 +            weight_decay=self.training_config.weight_decay,
+    174 +        )
+    175 +        self.scheduler = ReduceLROnPlateau(
+    176 +            self.optimizer,
+    177 +            mode="min",
+    178 +            factor=0.5,
+    179 +            patience=4,
+    180 +            min_lr=1e-5,
+    181 +        )
+    182 +        self.replay_buffer = ReplayBuffer(self.training_config.replay_c
+         apacity)
+    183 +        self.logger = CSVMetricLogger(self.training_config.log_csv_path
+         )
+    184 +        self.iteration = 0
+    185 +        self.phase = "self_play"
+    186 +        self.best_loss = float("inf")
+    187 +        self.pending_self_play_summary: dict[str, Any] | None = None
+    188 +        self.stop_requested = False
+    189 +        self.training_started_at = time.time()
+    190 +        self._install_signal_handler()
+    191 +
+    192 +    def _install_signal_handler(self) -> None:
+    193 +        previous_handler = signal.getsignal(signal.SIGINT)
+    194 +
+    195 +        def _handler(signum: int, frame: Any) -> None:  # pragma: no co
+         ver - signal wiring
+    196 +            self.stop_requested = True
+    197 +            print("SIGINT received; finishing the current phase before
+         checkpointing.")
+    198 +            if callable(previous_handler) and previous_handler not in (
+         signal.SIG_DFL, signal.SIG_IGN):
+    199 +                pass
+    200 +
+    201 +        signal.signal(signal.SIGINT, _handler)
+    202 +
+    203 +    def save_checkpoint(self, path: str) -> None:
+    204 +        directory = os.path.dirname(path)
+    205 +        if directory:
+    206 +            os.makedirs(directory, exist_ok=True)
+    207 +        torch.save(self._checkpoint_payload(), path)
+    208 +
+    209 +    def maybe_save_best(self, total_loss: float) -> None:
+    210 +        if total_loss < self.best_loss:
+    211 +            self.best_loss = total_loss
+    212 +            self.save_checkpoint(self.training_config.best_checkpoint_p
+         ath)
+    213 +
+    214 +    def load_checkpoint(self, path: str) -> None:
+    215 +        bundle = load_checkpoint_bundle(path, device=self.device)
+    216 +        self.model.load_state_dict(bundle["model_state"])
+    217 +        self.optimizer.load_state_dict(bundle["optimizer_state"])
+    218 +        self.scheduler.load_state_dict(bundle["scheduler_state"])
+    219 +        self.replay_buffer = ReplayBuffer.from_state_dict(bundle["repla
+         y_buffer"])
+    220 +        self.iteration = int(bundle["iteration"])
+    221 +        self.phase = str(bundle.get("phase", "self_play"))
+    222 +        self.best_loss = float(bundle["best_loss"])
+    223 +        pending = bundle.get("pending_self_play_summary")
+    224 +        self.pending_self_play_summary = None if pending is None else d
+         ict(pending)
+    225 +        self._restore_rng_state(bundle["rng_state"])
+    226 +
+    227 +    def run(self, *, deadline: datetime | None = None) -> None:
+    228 +        while self.iteration < self.training_config.iterations:
+    229 +            if deadline is not None and self._deadline_reached(deadline
+         ):
+    230 +                print("Approaching deadline reserve; stopping training.
+         ")
+    231 +                break
+    232 +            next_iteration = self.iteration + 1
+    233 +            if self.phase == "self_play":
+    234 +                self.pending_self_play_summary = asdict(self.run_self_p
+         lay_phase(next_iteration))
+    235 +                self.phase = "training"
+    236 +                self.save_checkpoint(self.training_config.latest_checkp
+         oint_path)
+    237 +                if self.stop_requested or (deadline is not None and sel
+         f._deadline_reached(deadline)):
+    238 +                    print("Stopping after self-play phase. Checkpoint s
+         aved.")
+    239 +                    break
+    240 +            if self.phase == "training":
+    241 +                print(f"Iteration {next_iteration}: training network...
+         ")
+    242 +                train_summary = self.run_training_phase()
+    243 +                self.scheduler.step(train_summary.total_loss)
+    244 +                self.iteration = next_iteration
+    245 +                metrics_row = self._merge_iteration_metrics(self.pendin
+         g_self_play_summary or {}, train_summary)
+    246 +                self._log_iteration(metrics_row)
+    247 +                self.phase = "self_play"
+    248 +                self.pending_self_play_summary = None
+    249 +                self.save_checkpoint(self.training_config.latest_checkp
+         oint_path)
+    250 +                self.maybe_save_best(train_summary.total_loss)
+    251 +                if self.stop_requested:
+    252 +                    print("Stopping after training phase. Checkpoint sa
+         ved.")
+    253 +                    break
+    254 +
+    255 +    def run_self_play_phase(self, iteration_index: int) -> SelfPlaySumm
+         ary:
+    256 +        self.model.eval()
+    257 +        evaluator = NeuralNetEvaluator(self.model, self.device)
+    258 +        search = MCTS(evaluator, self.mcts_config, rng=self.rng)
+    259 +        x_wins = 0
+    260 +        o_wins = 0
+    261 +        draws = 0
+    262 +        game_lengths: list[int] = []
+    263 +        root_best_moves: list[int] = []
+    264 +        root_visit_counts: list[int] = []
+    265 +        root_values: list[float] = []
+    266 +        policy_entropies: list[float] = []
+    267 +        encoded_states: list[np.ndarray] = []
+    268 +        policies: list[np.ndarray] = []
+    269 +        values: list[float] = []
+    270 +
+    271 +        for game_index in range(self.training_config.self_play_games_pe
+         r_iteration):
+    272 +            state = Connect4State.new_game()
+    273 +            game_examples: list[tuple[np.ndarray, np.ndarray, int]] = [
+         ]
+    274 +            move_counter = 0
+    275 +            while not state.is_terminal():
+    276 +                temperature = self.training_config.self_play_temperatur
+         e if move_counter < self.training_config.self_play_temperature_moves el
+         se 0.0
+    277 +                summary = search.search(
+    278 +                    state,
+    279 +                    add_exploration_noise=True,
+    280 +                    temperature=temperature,
+    281 +                )
+    282 +                game_examples.append((state.encode(), summary.action_pr
+         obs, state.current_player))
+    283 +                root_best_moves.append(summary.most_visited_move + 1)
+    284 +                root_visit_counts.append(summary.root_visit_count)
+    285 +                root_values.append(summary.root_value)
+    286 +                policy_entropies.append(_policy_entropy(summary.action_
+         probs))
+    287 +                state = state.play(summary.selected_move)
+    288 +                move_counter += 1
+    289 +
+    290 +            if state.winner == PLAYER_ONE:
+    291 +                x_wins += 1
+    292 +            elif state.winner == PLAYER_TWO:
+    293 +                o_wins += 1
+    294 +            else:
+    295 +                draws += 1
+    296 +            game_lengths.append(state.move_count)
+    297 +            for encoded, policy, player in game_examples:
+    298 +                encoded_states.append(encoded.astype(np.float16, copy=F
+         alse))
+    299 +                policies.append(policy.astype(np.float32, copy=False))
+    300 +                values.append(state.result_for(player))
+    301 +                if self.training_config.mirror_augmentation:
+    302 +                    encoded_states.append(_mirror_encoded_state(encoded
+         ))
+    303 +                    policies.append(mirror_policy(policy))
+    304 +                    values.append(state.result_for(player))
+    305 +            if (game_index + 1) % max(1, self.training_config.self_play
+         _games_per_iteration // 4) == 0:
+    306 +                print(
+    307 +                    f"Iteration {iteration_index}: self-play {game_inde
+         x + 1}/{self.training_config.self_play_games_per_iteration} "
+    308 +                    f"games complete."
+    309 +                )
+    310 +
+    311 +        self.replay_buffer.add_examples(
+    312 +            np.asarray(encoded_states, dtype=np.float16),
+    313 +            np.asarray(policies, dtype=np.float32),
+    314 +            np.asarray(values, dtype=np.float32),
+    315 +        )
+    316 +        summary = SelfPlaySummary(
+    317 +            x_win_rate=x_wins / self.training_config.self_play_games_pe
+         r_iteration,
+    318 +            o_win_rate=o_wins / self.training_config.self_play_games_pe
+         r_iteration,
+    319 +            draw_rate=draws / self.training_config.self_play_games_per_
+         iteration,
+    320 +            average_game_length=float(np.mean(game_lengths)) if game_le
+         ngths else 0.0,
+    321 +            replay_buffer_size=len(self.replay_buffer),
+    322 +            turnover_rate=self.replay_buffer.turnover_rate(),
+    323 +            positions_added=len(encoded_states),
+    324 +            root_most_visited_move=_mode_or_center(root_best_moves),
+    325 +            root_visit_count=float(np.mean(root_visit_counts)) if root_
+         visit_counts else 0.0,
+    326 +            root_value_estimate=float(np.mean(root_values)) if root_val
+         ues else 0.0,
+    327 +            avg_policy_entropy=float(np.mean(policy_entropies)) if poli
+         cy_entropies else 0.0,
+    328 +        )
+    329 +        print(
+    330 +            f"Iteration {iteration_index}: self-play summary | "
+    331 +            f"X win rate {summary.x_win_rate:.3f} | "
+    332 +            f"O win rate {summary.o_win_rate:.3f} | "
+    333 +            f"draw rate {summary.draw_rate:.3f} | "
+    334 +            f"avg game length {summary.average_game_length:.2f} | "
+    335 +            f"replay {summary.replay_buffer_size} | turnover {summary.t
+         urnover_rate:.3f}"
+    336 +        )
+    337 +        return summary
+    338 +
+    339 +    def run_training_phase(self) -> TrainSummary:
+    340 +        self.model.train()
+    341 +        if len(self.replay_buffer) == 0:
+    342 +            raise RuntimeError("cannot train without self-play data in
+         the replay buffer")
+    343 +        steps = self.training_config.training_steps_per_iteration
+    344 +        batch_size = min(self.training_config.batch_size, len(self.repl
+         ay_buffer))
+    345 +        total_loss_sum = 0.0
+    346 +        policy_loss_sum = 0.0
+    347 +        value_loss_sum = 0.0
+    348 +
+    349 +        for _ in range(steps):
+    350 +            batch = self.replay_buffer.sample(batch_size, self.rng)
+    351 +            losses = self._train_batch(batch)
+    352 +            total_loss_sum += losses[0]
+    353 +            policy_loss_sum += losses[1]
+    354 +            value_loss_sum += losses[2]
+    355 +
+    356 +        learning_rate = float(self.optimizer.param_groups[0]["lr"])
+    357 +        return TrainSummary(
+    358 +            total_loss=total_loss_sum / steps,
+    359 +            policy_loss=policy_loss_sum / steps,
+    360 +            value_loss=value_loss_sum / steps,
+    361 +            learning_rate=learning_rate,
+    362 +        )
+    363 +
+    364 +    def _train_batch(self, batch: ReplayBatch) -> tuple[float, float, f
+         loat]:
+    365 +        states = torch.from_numpy(batch.states).to(self.device)
+    366 +        target_policies = torch.from_numpy(batch.policies).to(self.devi
+         ce)
+    367 +        target_values = torch.from_numpy(batch.values).to(self.device)
+    368 +        self.optimizer.zero_grad(set_to_none=True)
+    369 +        policy_logits, values = self.model(states)
+    370 +        log_probs = torch.log_softmax(policy_logits, dim=1)
+    371 +        policy_loss = -(target_policies * log_probs).sum(dim=1).mean()
+    372 +        value_loss = torch.mean((values - target_values) ** 2)
+    373 +        total_loss = policy_loss + self.training_config.value_loss_weig
+         ht * value_loss
+    374 +        total_loss.backward()
+    375 +        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_nor
+         m=5.0)
+    376 +        self.optimizer.step()
+    377 +        return float(total_loss.item()), float(policy_loss.item()), flo
+         at(value_loss.item())
+    378 +
+    379 +    def _merge_iteration_metrics(self, self_play: dict[str, Any], train
+         : TrainSummary) -> dict[str, Any]:
+    380 +        timestamp = datetime.now(tz=ZoneInfo("UTC")).isoformat()
+    381 +        return {
+    382 +            "iteration": self.iteration + 1,
+    383 +            "timestamp_utc": timestamp,
+    384 +            "elapsed_seconds": round(time.time() - self.training_starte
+         d_at, 3),
+    385 +            "total_loss": round(train.total_loss, 6),
+    386 +            "policy_loss": round(train.policy_loss, 6),
+    387 +            "value_loss": round(train.value_loss, 6),
+    388 +            "learning_rate": round(train.learning_rate, 8),
+    389 +            "root_most_visited_move": self_play.get("root_most_visited_
+         move", 4),
+    390 +            "root_visit_count": round(float(self_play.get("root_visit_c
+         ount", 0.0)), 3),
+    391 +            "root_value_estimate": round(float(self_play.get("root_valu
+         e_estimate", 0.0)), 6),
+    392 +            "x_win_rate": round(float(self_play.get("x_win_rate", 0.0))
+         , 6),
+    393 +            "o_win_rate": round(float(self_play.get("o_win_rate", 0.0))
+         , 6),
+    394 +            "draw_rate": round(float(self_play.get("draw_rate", 0.0)),
+         6),
+    395 +            "average_game_length": round(float(self_play.get("average_g
+         ame_length", 0.0)), 3),
+    396 +            "replay_buffer_size": int(self_play.get("replay_buffer_size
+         ", len(self.replay_buffer))),
+    397 +            "turnover_rate": round(float(self_play.get("turnover_rate",
+          0.0)), 6),
+    398 +            "positions_added": int(self_play.get("positions_added", 0))
+         ,
+    399 +            "avg_policy_entropy": round(float(self_play.get("avg_policy
+         _entropy", 0.0)), 6),
+    400 +            "phase": "iteration_complete",
+    401 +        }
+    402 +
+    403 +    def _log_iteration(self, row: dict[str, Any]) -> None:
+    404 +        self.logger.log(row)
+    405 +        print(
+    406 +            f"Iteration {row['iteration']} complete | "
+    407 +            f"loss {row['total_loss']:.4f} | "
+    408 +            f"policy {row['policy_loss']:.4f} | "
+    409 +            f"value {row['value_loss']:.4f} | "
+    410 +            f"lr {row['learning_rate']:.6f} | "
+    411 +            f"root move {row['root_most_visited_move']} | "
+    412 +            f"root visits {row['root_visit_count']:.1f} | "
+    413 +            f"root value {row['root_value_estimate']:.3f}"
+    414 +        )
+    415 +
+    416 +    def _deadline_reached(self, deadline: datetime) -> bool:
+    417 +        now = datetime.now(tz=deadline.tzinfo)
+    418 +        return now >= deadline - timedelta(seconds=self.training_config
+         .reserve_seconds_before_deadline)
+    419 +
+    420 +    def _checkpoint_payload(self) -> dict[str, Any]:
+    421 +        return {
+    422 +            "iteration": self.iteration,
+    423 +            "phase": self.phase,
+    424 +            "best_loss": self.best_loss,
+    425 +            "model_state": self.model.state_dict(),
+    426 +            "optimizer_state": self.optimizer.state_dict(),
+    427 +            "scheduler_state": self.scheduler.state_dict(),
+    428 +            "replay_buffer": self.replay_buffer.state_dict(),
+    429 +            "training_config": self.training_config.to_dict(),
+    430 +            "network_config": self.network_config.to_dict(),
+    431 +            "mcts_config": asdict(self.mcts_config),
+    432 +            "pending_self_play_summary": self.pending_self_play_summary
+         ,
+    433 +            "rng_state": self._capture_rng_state(),
+    434 +            "training_started_at": self.training_started_at,
+    435 +        }
+    436 +
+    437 +    def _capture_rng_state(self) -> dict[str, Any]:
+    438 +        return {
+    439 +            "python_random": random.getstate(),
+    440 +            "numpy_random": np.random.get_state(),
+    441 +            "trainer_rng": self.rng.bit_generator.state,
+    442 +            "torch_random": torch.random.get_rng_state(),
+    443 +            "torch_cuda_random": torch.cuda.get_rng_state_all() if torc
+         h.cuda.is_available() else None,
+    444 +        }
+    445 +
+    446 +    def _restore_rng_state(self, state: dict[str, Any]) -> None:
+    447 +        random.setstate(state["python_random"])
+    448 +        np.random.set_state(state["numpy_random"])
+    449 +        self.rng = np.random.default_rng()
+    450 +        self.rng.bit_generator.state = state["trainer_rng"]
+    451 +        torch.random.set_rng_state(state["torch_random"])
+    452 +        if torch.cuda.is_available() and state["torch_cuda_random"] is
+         not None:
+    453 +            torch.cuda.set_rng_state_all(state["torch_cuda_random"])
+    454 +
+    455 +
+    456 +def _policy_entropy(policy: np.ndarray) -> float:
+    457 +    mask = policy > 0
+    458 +    if not np.any(mask):
+    459 +        return 0.0
+    460 +    return float(-(policy[mask] * np.log(policy[mask])).sum())
+    461 +
+    462 +
+    463 +def _mirror_encoded_state(encoded: np.ndarray) -> np.ndarray:
+    464 +    return np.ascontiguousarray(encoded[:, :, ::-1], dtype=np.float16)
+    465 +
+    466 +
+    467 +def _mode_or_center(values: list[int]) -> int:
+    468 +    if not values:
+    469 +        return 4
+    470 +    counts: dict[int, int] = {}
+    471 +    for value in values:
+    472 +        counts[value] = counts.get(value, 0) + 1
+    473 +    return max(counts.items(), key=lambda item: (item[1], -abs(4 - item
+         [0])))[0]
+    474 +
+    475 +
+    476 +def choose_model_move(
+    477 +    model: Connect4Net,
+    478 +    state: Connect4State,
+    479 +    *,
+    480 +    device: str,
+    481 +    simulations: int,
+    482 +    rng: np.random.Generator | None = None,
+    483 +) -> SearchSummary:
+    484 +    evaluator = NeuralNetEvaluator(model, device)
+    485 +    search = MCTS(evaluator, MCTSConfig(simulations=simulations), rng=r
+         ng)
+    486 +    return search.search(state, add_exploration_noise=False, temperatur
+         e=0.0)
+    487 +
+    488 +
+    489 +def load_model_for_inference(checkpoint_path: str, device: str = "auto"
+         ) -> tuple[Connect4Net, str]:
+    490 +    bundle = load_checkpoint_bundle(checkpoint_path, device="cpu")
+    491 +    network_config = NetworkConfig(**bundle["network_config"])
+    492 +    model = Connect4Net(network_config)
+    493 +    model.load_state_dict(bundle["model_state"])
+    494 +    resolved_device = TrainingConfig(device=device).resolved_device()
+    495 +    model = model.to(resolved_device)
+    496 +    model.eval()
+    497 +    return model, resolved_device
+    498 +
+    499 +
+    500 +def infer_move_from_history(
+    501 +    history_text: str,
+    502 +    checkpoint_path: str,
+    503 +    *,
+    504 +    simulations: int,
+    505 +    device: str = "auto",
+    506 +) -> tuple[str, SearchSummary | None]:
+    507 +    state = Connect4State.from_history_text(history_text)
+    508 +    if state.is_terminal():
+    509 +        if state.winner != 0:
+    510 +            return "LOSS", None
+    511 +        return "DRAW", None
+    512 +    model, resolved_device = load_model_for_inference(checkpoint_path,
+         device=device)
+    513 +    summary = choose_model_move(
+    514 +        model,
+    515 +        state,
+    516 +        device=resolved_device,
+    517 +        simulations=simulations,
+    518 +        rng=np.random.default_rng(0),
+    519 +    )
+    520 +    return str(summary.selected_move + 1), summary
+    521 +
+    522 +
+    523 +def read_history_file(path: str) -> str:
+    524 +    if not os.path.exists(path):
+    525 +        return ""
+    526 +    with open(path, "r", encoding="utf-8") as handle:
+    527 +        return handle.read().strip()
+    528 +
+    529 +
+    530 +def write_move_file(path: str, move_text: str) -> None:
+    531 +    with open(path, "w", encoding="utf-8") as handle:
+    532 +        handle.write(move_text)
+
+─ Worked for 1m 55s ────────────────────────────────────────────────────────────
+
+• The training stack is in. I’m running the test suite again immediately to
+  catch syntax or interface regressions before I add the trainer-specific tests.
+
+• Ran pytest -q
+  └ ...................
+    [100%]
+    19 passed in 0.05s
+
+• Ran python3 -m connect4_zero.cli --help
+  └ usage: cli.py [-h] {play-human,train,play-model,infer-move} ...
+
+    … +9 lines
+    options:
+      -h, --help            show this help message and exit
+
+• Ran python3 - <<'PY'
+  │ from connect4_zero.training import AlphaZeroTrainer, TrainingConfig
+  │ from connect4_zero.mcts import MCTSConfig
+  │ … +9 lines
+  └ Iteration 1: self-play 1/1 games complete.
+    Iteration 1: self-play summary | X win rate 0.000 | O win rate 1.000 | draw
+    rate 0.000 | avg game length 32.00 | replay 32 | turnover 1.000
+    self_play_ok 64 32
+    train_ok 4.583168983459473
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The command-line surface loads cleanly. I’m polling a tiny CPU-only self-play/
+  train smoke run now to verify the trainer works before writing the resume and
+  player.sh tests.
+
+• Waited for background terminal
+
+• I found one tactical issue during the smoke pass: root Dirichlet noise could
+  leak probability back onto tactically pruned moves. I’m fixing that now, along
+  with a small resume-time wall-clock restoration detail.
+
+• Edited 2 files (+2 -1)
+  └ connect4_zero/mcts.py (+1 -1)
+    183      def _add_dirichlet_noise(self, root: Node) -> None:
+    184 -        legal_moves = root.state.legal_moves()
+    184 +        legal_moves = [move for move in root.state.legal_moves() if roo
+         t.priors[move] > 0]
+    185          if not legal_moves:
+
+  └ connect4_zero/training.py (+1 -0)
+    224          self.pending_self_play_summary = None if pending is None else d
+         ict(pending)
+    225 +        self.training_started_at = float(bundle.get("training_started_a
+         t", time.time()))
+    226          self._restore_rng_state(bundle["rng_state"])
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’ve got enough surface area now to write the second test tranche: replay
+  buffer behavior, tactical MCTS choices, deadline parsing, and the save/load/
+  resume identity check. After that I’ll wire player.sh and the end-to-end
+  evaluation path.
+
+• Added tests/test_training_stack.py (+177 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +from dataclasses import replace
+      4 +from pathlib import Path
+      5 +
+      6 +import numpy as np
+      7 +import pytest
+      8 +import torch
+      9 +
+     10 +from connect4_zero.game import Connect4State, PLAYER_ONE, PLAYER_TWO, m
+         oves_to_history_text
+     11 +from connect4_zero.mcts import MCTS, MCTSConfig
+     12 +from connect4_zero.replay import ReplayBuffer
+     13 +from connect4_zero.training import (
+     14 +    AlphaZeroTrainer,
+     15 +    TrainingConfig,
+     16 +    infer_move_from_history,
+     17 +    parse_deadline_file,
+     18 +)
+     19 +
+     20 +
+     21 +def play_moves(moves: list[int]) -> Connect4State:
+     22 +    state = Connect4State.new_game()
+     23 +    for move in moves:
+     24 +        state = state.play(move)
+     25 +    return state
+     26 +
+     27 +
+     28 +class UniformEvaluator:
+     29 +    def evaluate(self, state: Connect4State) -> tuple[np.ndarray, float
+         ]:
+     30 +        priors = np.zeros((7,), dtype=np.float32)
+     31 +        legal = state.legal_moves()
+     32 +        priors[legal] = 1.0 / len(legal)
+     33 +        return priors, 0.0
+     34 +
+     35 +
+     36 +def assert_optimizer_state_equal(left: dict, right: dict) -> None:
+     37 +    assert left.keys() == right.keys()
+     38 +    for key in left:
+     39 +        left_value = left[key]
+     40 +        right_value = right[key]
+     41 +        if isinstance(left_value, dict):
+     42 +            assert_optimizer_state_equal(left_value, right_value)
+     43 +        elif isinstance(left_value, list):
+     44 +            assert len(left_value) == len(right_value)
+     45 +            for left_item, right_item in zip(left_value, right_value, s
+         trict=True):
+     46 +                if isinstance(left_item, dict):
+     47 +                    assert_optimizer_state_equal(left_item, right_item)
+     48 +                else:
+     49 +                    assert left_item == right_item
+     50 +        elif torch.is_tensor(left_value):
+     51 +            assert torch.equal(left_value, right_value)
+     52 +        else:
+     53 +            assert left_value == right_value
+     54 +
+     55 +
+     56 +def test_replay_buffer_round_trip_and_sampling() -> None:
+     57 +    buffer = ReplayBuffer(capacity=4)
+     58 +    state = Connect4State.new_game().encode()
+     59 +    states = np.stack([state, state + 1, state + 2], axis=0).astype(np.
+         float16)
+     60 +    policies = np.tile(np.array([[0, 0, 0, 1, 0, 0, 0]], dtype=np.float
+         32), (3, 1))
+     61 +    values = np.array([1.0, 0.0, -1.0], dtype=np.float32)
+     62 +    buffer.add_examples(states, policies, values)
+     63 +    assert len(buffer) == 3
+     64 +    batch = buffer.sample(batch_size=2, rng=np.random.default_rng(5))
+     65 +    assert batch.states.shape == (2, 3, 6, 7)
+     66 +    assert batch.policies.shape == (2, 7)
+     67 +    assert batch.values.shape == (2,)
+     68 +
+     69 +    restored = ReplayBuffer.from_state_dict(buffer.state_dict())
+     70 +    assert len(restored) == 3
+     71 +    assert np.array_equal(restored.states, buffer.states)
+     72 +    assert np.array_equal(restored.policies, buffer.policies)
+     73 +    assert np.array_equal(restored.values, buffer.values)
+     74 +
+     75 +
+     76 +def test_mcts_picks_immediate_winning_move() -> None:
+     77 +    state = play_moves([0, 4, 1, 4, 2, 5])
+     78 +    summary = MCTS(UniformEvaluator(), MCTSConfig(simulations=8)).searc
+         h(state, temperature=0.0)
+     79 +    assert summary.selected_move == 3
+     80 +    assert summary.action_probs[3] == pytest.approx(1.0)
+     81 +
+     82 +
+     83 +def test_mcts_blocks_opponent_immediate_win() -> None:
+     84 +    state = play_moves([6, 0, 6, 1, 5, 2])
+     85 +    summary = MCTS(UniformEvaluator(), MCTSConfig(simulations=8)).searc
+         h(state, temperature=0.0)
+     86 +    assert state.current_player == PLAYER_ONE
+     87 +    assert summary.selected_move == 3
+     88 +
+     89 +
+     90 +def test_parse_deadline_file(tmp_path: Path) -> None:
+     91 +    deadline_file = tmp_path / ".deadline"
+     92 +    deadline_file.write_text(
+     93 +        "Start time: Fri Apr  3 19:32:00 CDT 2026\nEnd time: Fri Apr  3
+          22:32:00 CDT 2026\n",
+     94 +        encoding="utf-8",
+     95 +    )
+     96 +    start, end = parse_deadline_file(str(deadline_file))
+     97 +    assert start.tzinfo is not None
+     98 +    assert end.tzinfo is not None
+     99 +    assert (end - start).total_seconds() == 3 * 3600
+    100 +
+    101 +
+    102 +def test_terminal_inference_returns_loss_and_draw_without_checkpoint()
+         -> None:
+    103 +    losing_history = "1122334"
+    104 +    assert infer_move_from_history(losing_history, "unused.pt", simulat
+         ions=16, device="cpu") == ("LOSS", None)
+    105 +
+    106 +    draw_moves = [
+    107 +        0, 0, 1, 1, 2, 2, 4,
+    108 +        3, 3, 5, 5, 4, 4, 6,
+    109 +        6, 0, 0, 1, 1, 2, 2,
+    110 +        4, 3, 3, 5, 5, 4, 4,
+    111 +        6, 6, 0, 0, 1, 1, 2,
+    112 +        2, 4, 3, 3, 5, 5, 6,
+    113 +    ]
+    114 +    draw_history = moves_to_history_text(draw_moves)
+    115 +    assert infer_move_from_history(draw_history, "unused.pt", simulatio
+         ns=16, device="cpu") == ("DRAW", None)
+    116 +
+    117 +
+    118 +def test_checkpoint_resume_cycle_is_identical(tmp_path: Path) -> None:
+    119 +    direct_dir = tmp_path / "direct"
+    120 +    split_dir = tmp_path / "split"
+    121 +    direct_dir.mkdir()
+    122 +    split_dir.mkdir()
+    123 +
+    124 +    direct_config = TrainingConfig(
+    125 +        seed=17,
+    126 +        device="cpu",
+    127 +        replay_capacity=128,
+    128 +        self_play_games_per_iteration=2,
+    129 +        training_steps_per_iteration=2,
+    130 +        batch_size=16,
+    131 +        iterations=2,
+    132 +        log_csv_path=str(direct_dir / "training.csv"),
+    133 +        latest_checkpoint_path=str(direct_dir / "latest.pt"),
+    134 +        best_checkpoint_path=str(direct_dir / "best.pt"),
+    135 +    )
+    136 +    first_iteration_config = replace(
+    137 +        direct_config,
+    138 +        iterations=1,
+    139 +        log_csv_path=str(split_dir / "training_stage1.csv"),
+    140 +        latest_checkpoint_path=str(split_dir / "latest.pt"),
+    141 +        best_checkpoint_path=str(split_dir / "best.pt"),
+    142 +    )
+    143 +    resumed_config = replace(
+    144 +        direct_config,
+    145 +        log_csv_path=str(split_dir / "training_stage2.csv"),
+    146 +        latest_checkpoint_path=str(split_dir / "latest.pt"),
+    147 +        best_checkpoint_path=str(split_dir / "best.pt"),
+    148 +    )
+    149 +
+    150 +    mcts_config = MCTSConfig(simulations=8)
+    151 +    direct_trainer = AlphaZeroTrainer(training_config=direct_config, mc
+         ts_config=mcts_config)
+    152 +    direct_trainer.run()
+    153 +
+    154 +    stage_one_trainer = AlphaZeroTrainer(training_config=first_iteratio
+         n_config, mcts_config=mcts_config)
+    155 +    stage_one_trainer.run()
+    156 +
+    157 +    resumed_trainer = AlphaZeroTrainer(training_config=resumed_config,
+         mcts_config=mcts_config)
+    158 +    resumed_trainer.load_checkpoint(str(split_dir / "latest.pt"))
+    159 +    resumed_trainer.run()
+    160 +
+    161 +    assert direct_trainer.iteration == 2
+    162 +    assert resumed_trainer.iteration == 2
+    163 +    assert direct_trainer.phase == resumed_trainer.phase == "self_play"
+    164 +    assert direct_trainer.optimizer.param_groups[0]["lr"] == pytest.app
+         rox(
+    165 +        resumed_trainer.optimizer.param_groups[0]["lr"]
+    166 +    )
+    167 +    assert direct_trainer.scheduler.state_dict() == resumed_trainer.sch
+         eduler.state_dict()
+    168 +
+    169 +    direct_state = direct_trainer.model.state_dict()
+    170 +    resumed_state = resumed_trainer.model.state_dict()
+    171 +    assert direct_state.keys() == resumed_state.keys()
+    172 +    for key in direct_state:
+    173 +        assert torch.equal(direct_state[key], resumed_state[key])
+    174 +
+    175 +    direct_optimizer_state = direct_trainer.optimizer.state_dict()
+    176 +    resumed_optimizer_state = resumed_trainer.optimizer.state_dict()
+    177 +    assert_optimizer_state_equal(direct_optimizer_state, resumed_optimi
+         zer_state)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The trainer and search tests are in. I’m running them now; the checkpoint-
+  resume case is the important one because it exercises the save/load contract,
+  scheduler state, and optimizer momentum together.
+
+• Waited for background terminal · pytest -q
+
+• Ran pytest -q
+  └ .......................F.
+    [100%]
+    … +50 lines
+    t_checkpoint
+    1 failed, 24 passed in 2.07s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The failure is in the test fixture, not the code: that hand-written draw
+  history actually hits a win partway through. I’m replacing it with a generated
+  full-board draw sequence so the terminal DRAW path is exercised correctly.
+
+• Edited tests/test_training_stack.py (+18 -7)
+    105
+    106 -    draw_moves = [
+    107 -        0, 0, 1, 1, 2, 2, 4,
+    108 -        3, 3, 5, 5, 4, 4, 6,
+    109 -        6, 0, 0, 1, 1, 2, 2,
+    110 -        4, 3, 3, 5, 5, 4, 4,
+    111 -        6, 6, 0, 0, 1, 1, 2,
+    112 -        2, 4, 3, 3, 5, 5, 6,
+    106 +    rows = [
+    107 +        [PLAYER_ONE, PLAYER_ONE, PLAYER_TWO, PLAYER_TWO, PLAYER_ONE, PL
+         AYER_ONE, PLAYER_TWO],
+    108 +        [PLAYER_TWO, PLAYER_TWO, PLAYER_ONE, PLAYER_ONE, PLAYER_TWO, PL
+         AYER_TWO, PLAYER_ONE],
+    109 +        [PLAYER_ONE, PLAYER_ONE, PLAYER_TWO, PLAYER_TWO, PLAYER_ONE, PL
+         AYER_ONE, PLAYER_TWO],
+    110 +        [PLAYER_TWO, PLAYER_TWO, PLAYER_ONE, PLAYER_ONE, PLAYER_TWO, PL
+         AYER_TWO, PLAYER_ONE],
+    111 +        [PLAYER_ONE, PLAYER_ONE, PLAYER_TWO, PLAYER_TWO, PLAYER_ONE, PL
+         AYER_ONE, PLAYER_TWO],
+    112 +        [PLAYER_TWO, PLAYER_TWO, PLAYER_ONE, PLAYER_ONE, PLAYER_TWO, PL
+         AYER_TWO, PLAYER_ONE],
+    113      ]
+    114 +    draw_moves: list[int] = []
+    115 +    heights = [0] * 7
+    116 +    while len(draw_moves) < 42:
+    117 +        for col in range(7):
+    118 +            row = heights[col]
+    119 +            if row < 6:
+    120 +                target_player = rows[row][col]
+    121 +                current_player = PLAYER_ONE if len(draw_moves) % 2 == 0
+          else PLAYER_TWO
+    122 +                if current_player == target_player:
+    123 +                    draw_moves.append(col)
+    124 +                    heights[col] += 1
+    125      draw_history = moves_to_history_text(draw_moves)
+
+• Waited for background terminal · pytest -q
+
+• Ran pytest -q
+  └ .........................
+    [100%]
+    25 passed in 2.07s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The evaluation path is next. I’m adding player.sh and setup.sh with a
+  conservative fallback training path so the clean-container run still has a
+  checkpoint even if the saved artifacts are missing.
+
+• Edited 2 files (+52 -0)
+  └ player.sh (+34 -0)
+     1 +#!/usr/bin/env bash
+     2 +set -euo pipefail
+     3 +
+     4 +ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+     5 +cd "$ROOT_DIR"
+     6 +
+     7 +mkdir -p artifacts
+     8 +
+     9 +CHECKPOINT_PATH="artifacts/best.pt"
+    10 +if [[ ! -f "$CHECKPOINT_PATH" ]]; then
+    11 +  CHECKPOINT_PATH="artifacts/latest.pt"
+    12 +fi
+    13 +
+    14 +if [[ ! -f "$CHECKPOINT_PATH" ]]; then
+    15 +  python3 -m connect4_zero.cli train \
+    16 +    --iterations 4 \
+    17 +    --self-play-games 4 \
+    18 +    --simulations 64 \
+    19 +    --training-steps 16 \
+    20 +    --batch-size 128 \
+    21 +    --device auto \
+    22 +    --checkpoint-dir artifacts
+    23 +  CHECKPOINT_PATH="artifacts/best.pt"
+    24 +  if [[ ! -f "$CHECKPOINT_PATH" ]]; then
+    25 +    CHECKPOINT_PATH="artifacts/latest.pt"
+    26 +  fi
+    27 +fi
+    28 +
+    29 +python3 -m connect4_zero.cli infer-move \
+    30 +  --checkpoint "$CHECKPOINT_PATH" \
+    31 +  --input "game_state.txt" \
+    32 +  --output "next_move.txt" \
+    33 +  --simulations "${CONNECT4_EVAL_SIMULATIONS:-600}" \
+    34 +  --device auto
+
+  └ setup.sh (+18 -0)
+     1 +#!/usr/bin/env bash
+     2 +set -euo pipefail
+     3 +
+     4 +ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+     5 +cd "$ROOT_DIR"
+     6 +
+     7 +mkdir -p artifacts
+     8 +
+     9 +if [[ ! -f "artifacts/best.pt" && ! -f "artifacts/latest.pt" ]]; then
+    10 +  python3 -m connect4_zero.cli train \
+    11 +    --iterations 4 \
+    12 +    --self-play-games 4 \
+    13 +    --simulations 64 \
+    14 +    --training-steps 16 \
+    15 +    --batch-size 128 \
+    16 +    --device auto \
+    17 +    --checkpoint-dir artifacts
+    18 +fi
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m adding one more automated check around the inference path with a real
+  checkpoint payload. That closes the loop between saved artifacts and move
+  selection without needing to shell out inside every test.
+
+• Edited tests/test_training_stack.py (+24 -0)
+    128
+    129 +def test_nonterminal_inference_returns_valid_move_with_checkpoint(tmp_p
+         ath: Path) -> None:
+    130 +    checkpoint_path = tmp_path / "model.pt"
+    131 +    trainer = AlphaZeroTrainer(
+    132 +        training_config=TrainingConfig(
+    133 +            seed=5,
+    134 +            device="cpu",
+    135 +            iterations=1,
+    136 +            replay_capacity=32,
+    137 +            self_play_games_per_iteration=1,
+    138 +            training_steps_per_iteration=1,
+    139 +            batch_size=8,
+    140 +            log_csv_path=str(tmp_path / "training.csv"),
+    141 +            latest_checkpoint_path=str(checkpoint_path),
+    142 +            best_checkpoint_path=str(tmp_path / "best.pt"),
+    143 +        ),
+    144 +        mcts_config=MCTSConfig(simulations=4),
+    145 +    )
+    146 +    trainer.save_checkpoint(str(checkpoint_path))
+    147 +    move_text, summary = infer_move_from_history("", str(checkpoint_pat
+         h), simulations=16, device="cpu")
+    148 +    assert move_text in {"1", "2", "3", "4", "5", "6", "7"}
+    149 +    assert summary is not None
+    150 +    assert summary.selected_move == int(move_text) - 1
+    151 +
+    152 +
+    153  def test_checkpoint_resume_cycle_is_identical(tmp_path: Path) -> None:
+
+• Waited for background terminal · pytest -q
+
+• Ran pytest -q
+  └ ..........................
+    [100%]
+    26 passed in 2.11s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The code and tests are stable at this point. I’m switching to operational
+  validation now: executable scripts, a real short training run, and an end-to-
+  end player.sh smoke test before I launch a longer training job.
+
+• Ran chmod +x /workspace/player.sh /workspace/setup.sh
+  └ (no output)
+
+• Ran python3 -m connect4_zero.cli train --iterations 1 --self-play-games 2
+  │ --simulations 8 --training-steps 2 --batch-size 16 --device cpu
+  │ --checkpoint-dir artifacts_smoke
+  └ Iteration 1: self-play 1/2 games complete.
+    Iteration 1: self-play 2/2 games complete.
+    … +3 lines
+    Iteration 2 complete | loss 3.8095 | policy 2.1161 | value 1.6934 | lr
+    0.001000 | root move 2 | root visits 19.5 | root value -0.007
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I found two training-quality issues during the smoke run: the logged iteration
+  number was off by one, and the training target policy was collapsing to the
+  move-selection temperature instead of the raw visit distribution. I’m
+  correcting both before I do the longer training pass.
+
+• Edited 2 files (+24 -11)
+  └ connect4_zero/mcts.py (+10 -7)
+     90              visit_counts[move] = 0 if child is None else child.visit_co
+         unt
+     91 -        action_probs = self._visit_distribution(visit_counts, temperatu
+         re=temperature)
+     91 +        action_probs = self._normalized_visit_distribution(visit_counts
+         )
+     92          selected_move = self._select_final_move(visit_counts, temperatu
+         re=temperature)
+        ⋮
+    198      def _visit_distribution(self, visit_counts: np.ndarray, temperature
+         : float) -> np.ndarray:
+    199 -        distribution = np.zeros((COLS,), dtype=np.float32)
+    200 -        total_visits = visit_counts.sum()
+    201 -        if total_visits <= 0:
+    202 -            return distribution
+    199          if temperature <= 1e-6:
+    204 -            distribution[int(np.argmax(visit_counts))] = 1.0
+    205 -            return distribution
+    200 +            return self._normalized_visit_distribution(visit_counts)
+    201          scaled = np.power(np.maximum(visit_counts, 1e-6), 1.0 / tempera
+         ture, dtype=np.float64)
+    202          scaled_sum = scaled.sum()
+    203 +        distribution = np.zeros((COLS,), dtype=np.float32)
+    204          if scaled_sum <= 0:
+        ⋮
+    209
+    210 +    def _normalized_visit_distribution(self, visit_counts: np.ndarray)
+         -> np.ndarray:
+    211 +        distribution = np.zeros((COLS,), dtype=np.float32)
+    212 +        total_visits = float(visit_counts.sum())
+    213 +        if total_visits <= 0:
+    214 +            return distribution
+    215 +        return (visit_counts / total_visits).astype(np.float32)
+    216 +
+    217      def _select_final_move(self, visit_counts: np.ndarray, temperature:
+          float) -> int:
+
+  └ connect4_zero/training.py (+14 -4)
+    245                  self.iteration = next_iteration
+    246 -                metrics_row = self._merge_iteration_metrics(self.pendin
+         g_self_play_summary or {}, train_summary)
+    246 +                metrics_row = self._merge_iteration_metrics(
+    247 +                    iteration_index=next_iteration,
+    248 +                    self_play=self.pending_self_play_summary or {},
+    249 +                    train=train_summary,
+    250 +                )
+    251                  self._log_iteration(metrics_row)
+        ⋮
+    262          evaluator = NeuralNetEvaluator(self.model, self.device)
+    259 -        search = MCTS(evaluator, self.mcts_config, rng=self.rng)
+    263          x_wins = 0
+        ⋮
+    275          for game_index in range(self.training_config.self_play_games_pe
+         r_iteration):
+    276 +            search = MCTS(evaluator, self.mcts_config, rng=self.rng)
+    277              state = Connect4State.new_game()
+        ⋮
+    383
+    380 -    def _merge_iteration_metrics(self, self_play: dict[str, Any], train
+         : TrainSummary) -> dict[str, Any]:
+    384 +    def _merge_iteration_metrics(
+    385 +        self,
+    386 +        *,
+    387 +        iteration_index: int,
+    388 +        self_play: dict[str, Any],
+    389 +        train: TrainSummary,
+    390 +    ) -> dict[str, Any]:
+    391          timestamp = datetime.now(tz=ZoneInfo("UTC")).isoformat()
+    392          return {
+    383 -            "iteration": self.iteration + 1,
+    393 +            "iteration": iteration_index,
+    394              "timestamp_utc": timestamp,
+
+• Waited for background terminal · pytest -q
+
+• Ran pytest -q
+  └ ..........................
+    [100%]
+    26 passed in 2.21s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The test suite is still green after the policy/iteration fixes. I’m rerunning
+  a tiny smoke training in a fresh output directory to confirm the runtime logs
+  now match the actual iteration numbering.
+
+• Ran python3 -m connect4_zero.cli train --iterations 1 --self-play-games 2
+  │ --simulations 8 --training-steps 2 --batch-size 16 --device cpu
+  │ --checkpoint-dir artifacts_smoke2
+  └ Iteration 1: self-play 1/2 games complete.
+    Iteration 1: self-play 2/2 games complete.
+    … +3 lines
+    Iteration 1 complete | loss 3.7693 | policy 2.0813 | value 1.6881 | lr
+    0.001000 | root move 2 | root visits 19.3 | root value -0.008
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I need one more operational answer before the final training run: whether
+  sequential MCTS leaf evaluation is faster on CPU or GPU for this model size.
+  I’m doing a quick benchmark because that directly affects how many simulations
+  I can afford per move.
+
+• Ran python3 - <<'PY'
+  │ import time
+  │ from connect4_zero.training import AlphaZeroTrainer, TrainingConfig
+  │ … +20 lines
+  └ Iteration 1: self-play 1/2 games complete.
+    Iteration 1: self-play 2/2 games complete.
+    … +6 lines
+    rate 0.500 | avg game length 40.50 | replay 162 | turnover 0.000
+    cuda self_play 1.033 train 0.104
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The benchmark answers the device question cleanly: for this small model and
+  single-state MCTS inference, CPU is actually faster than GPU. I’m baking that
+  into the automation scripts so evaluation-time move generation stays low-
+  latency and predictable.
+
+• Edited 2 files (+3 -3)
+  └ player.sh (+2 -2)
+    20      --batch-size 128 \
+    21 -    --device auto \
+    21 +    --device "${CONNECT4_DEVICE:-cpu}" \
+    22      --checkpoint-dir artifacts
+       ⋮
+    33    --simulations "${CONNECT4_EVAL_SIMULATIONS:-600}" \
+    34 -  --device auto
+    34 +  --device "${CONNECT4_DEVICE:-cpu}"
+
+  └ setup.sh (+1 -1)
+    15      --batch-size 128 \
+    16 -    --device auto \
+    16 +    --device "${CONNECT4_DEVICE:-cpu}" \
+    17      --checkpoint-dir artifacts
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’ve got a staged training plan now: bootstrap with cheaper self-play first,
+  then resume with larger search budgets. I’m starting the first real run into /
+  workspace/artifacts so the evaluation scripts will point at a real checkpoint
+  rather than the fallback.
+
+• Explored
+  └ List artifacts
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The first training phase is running. I’m watching the iteration metrics rather
+  than just waiting on completion, because if loss or win rates flatten too
+  early I’ll adjust the second-stage search budget instead of blindly resuming
+  with the same settings.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train
+--iterations 30 --self-play-games 12 --simulations 64 --training-steps 96
+--batch-size 256 --device cpu --checkpoint-dir artifacts
+
+• The trainer is still active, but the Python process is buffered in this
+  execution mode, so I’m not getting per-line output yet. I’m letting this phase
+  finish rather than restarting it with unbuffered output, because the artifacts
+  being produced matter more than live streaming at this point.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train
+--iterations 30 --self-play-games 12 --simulations 64 --training-steps 96
+--batch-size 256 --device cpu --checkpoint-dir artifacts
+
+• The first full training stage is still in progress. I’ll keep it running
+  through completion, then inspect the CSV and checkpoint outputs before
+  deciding whether to escalate the simulation count for the next stage.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train
+--iterations 30 --self-play-games 12 --simulations 64 --training-steps 96
+--batch-size 256 --device cpu --checkpoint-dir artifacts
+
+• This phase is taking longer than the rough linear estimate, which likely means
+  later positions are driving longer games and larger replay batches. I’m
+  staying with it until the first stage checkpoint lands, because that
+  checkpoint is the decision point for whether another stage is worth the added
+  time.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train
+--iterations 30 --self-play-games 12 --simulations 64 --training-steps 96
+--batch-size 256 --device cpu --checkpoint-dir artifacts
+
+• The process is still live and stdout is fully buffered, so I’m checking the
+  artifact directory from a second shell to make sure checkpoints/logs are
+  actually advancing rather than sitting on a stalled process.
+
+• Ran if [ -f /workspace/artifacts/training_log.csv ]; then tail -n 5 /
+  │ workspace/artifacts/training_log.csv; fi
+  └ 9,2026-04-03T19:46:14.336668-05:00,109.494,2.697196,0.978446,1.71875,0.001,1
+    ,169.527,0.004359,0.333333,0.416667,0.25,34.167,7374,0.0,820,0.800124,iterat
+    … +11 lines
+    6,168.886,0.004695,0.5,0.333333,0.166667,32.167,10610,0.0,772,0.798645,itera
+    tion_complete
+
+• Explored
+  └ List artifacts
+
+• Ran ps -o pid,etime,pcpu,pmem,cmd -p $(pgrep -f 'python3 -m connect4_zero.cli
+  │ train --iterations 30 --self-play-games 12 --simulations 64
+  │ --training-steps 96 --batch-size 256 --device cpu --checkpoint-dir
+  │ … +1 lines
+  └     PID     ELAPSED %CPU %MEM CMD
+        522       02:47  785  2.4 python3 -m connect4_zero.cli train
+    --iterations 30 --self-play-games 12 --simulations 64 --training-steps 96
+    --batch-size 256 --device cpu --checkpoint-dir artifacts
+
+─ Worked for 2m 48s ────────────────────────────────────────────────────────────
+
+• The run is progressing normally. I confirmed live checkpoints and CSV updates
+  in artifacts/; it’s about 12 seconds per iteration, with iteration 13 already
+  complete and the checkpoint files landing correctly.
+
+• Ran wc -l /workspace/artifacts/training_log.csv
+  └ 15 /workspace/artifacts/training_log.csv
+
+• Explored
+  └ Read training_log.csv
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The live metrics show the system is still in the early-learning regime: loss
+  has flattened around 2.70, replay size is growing steadily, and self-play
+  outcomes are starting to vary instead of collapsing to one side. I’m letting
+  stage one finish before increasing the search budget.
+
+• Waited for background terminal · python3 - <<'PY'
+import time
+from pathlib import Path
+log = Path('/workspace/artifacts/training_log.csv')
+for _ in range(6):
+    if log.exists():
+        lines = log.read_text().strip().splitlines()
+        print('lines', len(lines))
+        if len(lines) > 1:
+            print(lines[-1])
+    time.sleep(20)
+PY
+
+• Ran python3 - <<'PY'
+  │ import time
+  │ from pathlib import Path
+  │ … +9 lines
+  └ lines 15
+    14,2026-04-03T19:47:15.148304-05:00,170.306,2.711961,0.985561,1.7264,0.001,7
+    … +18 lines
+    5,2,176.8,0.002039,0.5,0.25,0.25,37.5,18354,0.0,900,0.792938,iteration_compl
+    ete
+
+─ Worked for 2m 04s ────────────────────────────────────────────────────────────
+
+• Stage one is showing actual movement now. The scheduler has already stepped
+  the LR down to 5e-4, and loss has improved into the 2.66-2.67 range while
+  replay coverage has expanded past 18k examples.
+
+• Ran wc -l /workspace/artifacts/training_log.csv
+  └ 25 /workspace/artifacts/training_log.csv
+
+• Ran ps -o pid,etime,pcpu,pmem -p $(pgrep -f 'python3 -m connect4_zero.cli
+  │ train --iterations 30 --self-play-games 12 --simulations 64
+  │ --training-steps 96 --batch-size 256 --device cpu --checkpoint-dir
+  │ … +1 lines
+  └     PID     ELAPSED %CPU %MEM
+        522       04:59  786  2.4
+
+• Waited for background terminal · python3 -m connect4_zero.cli train
+--iterations 30 --self-play-games 12 --simulations 64 --training-steps 96
+--batch-size 256 --device cpu --checkpoint-dir artifacts
+
+• Ran python3 -m connect4_zero.cli train --iterations 30 --self-play-games 12
+  │ --simulations 64 --training-steps 96 --batch-size 256 --device cpu
+  │ --checkpoint-dir artifacts
+  └ Iteration 1: self-play 3/12 games complete.
+    Iteration 1: self-play 6/12 games complete.
+    … +209 lines
+    Iteration 30 complete | loss 2.6551 | policy 0.9173 | value 1.7378 | lr
+    0.000250 | root move 5 | root visits 193.6 | root value 0.008
+
+─ Worked for 1m 26s ────────────────────────────────────────────────────────────
+
+• Stage one finished cleanly at 30 iterations. I’m moving to a second phase with
+  a larger search budget on top of the existing checkpoint instead of just
+  extending the cheap run, because the replay buffer is now large enough that
+  stronger search targets should be more useful than more low-budget self-play.
+
+• The higher-simulation resume run is live now. I’m going to watch the delta in
+  loss and the self-play summary relative to the first stage rather than just
+  letting it blindly run to 45 if the stronger search clearly stops paying off.
+
+• Ran ps -o pid,etime,pcpu,pmem,cmd -p $(pgrep -f 'python3 -m connect4_zero.cli
+  │ train --iterations 45 --resume artifacts/latest.pt --self-play-games 12
+  │ --simulations 128 --training-steps 96 --batch-size 256 --device cpu
+  │ … +1 lines
+  └     PID     ELAPSED %CPU %MEM CMD
+        581       00:05  682  2.2 python3 -m connect4_zero.cli train
+    --iterations 45 --resume artifacts/latest.pt --self-play-games 12
+    --simulations 128 --training-steps 96 --batch-size 256 --device cpu
+    --checkpoint-dir artifacts
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The phase-two process is healthy. I’ve got a separate CSV monitor running now
+  so I can decide quickly whether the 128-simulation targets are still improving
+  the model enough to justify a final short third stage.
+
+• Ran wc -l /workspace/artifacts/training_log.csv
+  └ 37 /workspace/artifacts/training_log.csv
+
+• Waited for background terminal · python3 - <<'PY'
+import time
+from pathlib import Path
+log = Path('/workspace/artifacts/training_log.csv')
+start = time.time()
+while time.time() - start < 210:
+    lines = log.read_text().strip().splitlines()
+    print(len(lines), lines[-1])
+    time.sleep(30)
+PY
+
+• Explored
+  └ Read training_log.csv
+    List artifacts
+
+─ Worked for 2m 16s ────────────────────────────────────────────────────────────
+
+• One model-selection detail is worth tightening before finalizing: lowest
+  training loss is not the same thing as strongest game-play. I’m switching the
+  play/evaluation defaults to latest.pt and keeping best.pt as a logged loss
+  checkpoint.
+
+• Edited 2 files (+6 -6)
+  └ connect4_zero/cli.py (+2 -2)
+    64      model_parser = subparsers.add_parser("play-model", help="Play agains
+        t the trained model")
+    65 -    model_parser.add_argument("--checkpoint", default="artifacts/best.pt
+        ")
+    65 +    model_parser.add_argument("--checkpoint", default="artifacts/latest.
+        pt")
+    66      first_group = model_parser.add_mutually_exclusive_group()
+       ⋮
+    72      infer_parser = subparsers.add_parser("infer-move", help="Choose a mo
+        ve from game_state.txt")
+    73 -    infer_parser.add_argument("--checkpoint", default="artifacts/best.pt
+        ")
+    73 +    infer_parser.add_argument("--checkpoint", default="artifacts/latest.
+        pt")
+    74      infer_parser.add_argument("--input", default="game_state.txt")
+
+  └ player.sh (+4 -4)
+     8
+     9 -CHECKPOINT_PATH="artifacts/best.pt"
+     9 +CHECKPOINT_PATH="artifacts/latest.pt"
+    10  if [[ ! -f "$CHECKPOINT_PATH" ]]; then
+    11 -  CHECKPOINT_PATH="artifacts/latest.pt"
+    11 +  CHECKPOINT_PATH="artifacts/best.pt"
+    12  fi
+       ⋮
+    22      --checkpoint-dir artifacts
+    23 -  CHECKPOINT_PATH="artifacts/best.pt"
+    23 +  CHECKPOINT_PATH="artifacts/latest.pt"
+    24    if [[ ! -f "$CHECKPOINT_PATH" ]]; then
+    25 -    CHECKPOINT_PATH="artifacts/latest.pt"
+    25 +    CHECKPOINT_PATH="artifacts/best.pt"
+    26    fi
+
+• Ran wc -l /workspace/artifacts/training_log.csv
+  └ 38 /workspace/artifacts/training_log.csv
+
+• Explored
+  └ Read training_log.csv
+
+• Ran ps -o pid,etime,pcpu,pmem -p $(pgrep -f 'python3 -m connect4_zero.cli
+  │ train --iterations 45 --resume artifacts/latest.pt --self-play-games 12
+  │ --simulations 128 --training-steps 96 --batch-size 256 --device cpu
+  │ … +1 lines
+  └     PID     ELAPSED %CPU %MEM
+        581       02:33  785  2.5
+
+────────────────────────────────────────────────────────────────────────────────
+
+• Phase two is earning its keep now. Iteration 37 dropped the loss to 2.6391,
+  which is the best so far, so I’m letting the 128-simulation run complete
+  before I make any call on a final short polish stage.
+
+• Ran python3 - <<'PY'
+  │ import time
+  │ from pathlib import Path
+  │ … +7 lines
+  └ 31
+    30,2026-04-03T19:50:37.295633-05:00,372.453,2.655085,0.917333,1.737752,0.000
+    … +24 lines
+    125,1,370.126,0.004773,0.25,0.416667,0.333333,38.917,31746,0.0,934,0.762586,
+    iteration_complete
+
+• Waited for background terminal · python3 -m connect4_zero.cli train
+--iterations 45 --resume artifacts/latest.pt --self-play-games 12 --simulations
+128 --training-steps 96 --batch-size 256 --device cpu --checkpoint-dir artifacts
+
+• Ran python3 -m connect4_zero.cli train --iterations 45 --resume artifacts/
+  │ latest.pt --self-play-games 12 --simulations 128 --training-steps 96
+  │ --batch-size 256 --device cpu --checkpoint-dir artifacts
+  └ Iteration 31: self-play 3/12 games complete.
+    Iteration 31: self-play 6/12 games complete.
+    … +104 lines
+    Iteration 45 complete | loss 1.2843 | policy 1.0170 | value 0.2673 | lr
+    0.000125 | root move 4 | root visits 322.7 | root value 0.008
+
+─ Worked for 2m 42s ────────────────────────────────────────────────────────────
+
+• Phase two paid off much more than expected: once the stronger search targets
+  propagated into the replay, value loss collapsed and total loss reached 1.2843
+  by iteration 45. I’m doing one short polish stage with fewer games but 192
+  simulations to sharpen the final checkpoint rather than stopping at the first
+  big drop.
+
+• The final polish run is live. It’s intentionally short and more search-heavy,
+  so I’m expecting either a modest improvement in the latest checkpoint or a
+  clear plateau within a couple of minutes.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train
+--iterations 50 --resume artifacts/latest.pt --self-play-games 8 --simulations
+192 --training-steps 96 --batch-size 256 --device cpu --checkpoint-dir artifacts
+
+• Ran python3 -m connect4_zero.cli train --iterations 50 --resume artifacts/
+  │ latest.pt --self-play-games 8 --simulations 192 --training-steps 96
+  │ --batch-size 256 --device cpu --checkpoint-dir artifacts
+  └ Iteration 46: self-play 2/8 games complete.
+    Iteration 46: self-play 4/8 games complete.
+    … +34 lines
+    Iteration 50 complete | loss 1.2552 | policy 1.0307 | value 0.2245 | lr
+    0.000125 | root move 4 | root visits 543.3 | root value 0.011
+
+─ Worked for 1m 56s ────────────────────────────────────────────────────────────
+
+• The polish stage improved the final model a bit further, bottoming out at
+  1.2417 on iteration 49 before flattening at iteration 50. I’m stopping there
+  and moving to validation, because that’s enough evidence of diminishing
+  returns to justify spending the remaining time on end-to-end checks instead of
+  more self-play.
+
+• I’m in the final validation pass now: re-running the automated suite after the
+  last script/default changes, then smoking player.sh against empty, terminal,
+  and nonterminal histories using the trained checkpoint.
+
+• Waited for background terminal · pytest -q
+
+• Explored
+  └ List artifacts
+    Read training_log.csv
+
+• Ran pytest -q
+  └ ..........................
+    [100%]
+    26 passed in 2.23s
+
+• Ran printf '1122334' > /workspace/game_state.txt &&
+  │ CONNECT4_EVAL_SIMULATIONS=256 /workspace/player.sh && printf ' terminal:'
+  │ && cat /workspace/next_move.txt
+  └  terminal:7
+
+• Ran printf '445566' > /workspace/game_state.txt &&
+  │ CONNECT4_EVAL_SIMULATIONS=256 /workspace/player.sh && printf ' mid:' &&
+  │ cat /workspace/next_move.txt
+  └  mid:7
+
+• Ran printf '' > /workspace/game_state.txt && CONNECT4_EVAL_SIMULATIONS=256 /
+  │ workspace/player.sh && printf 'empty:' && cat /workspace/next_move.txt
+  └ empty:7
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The first shell smoke used the same game_state.txt/next_move.txt files in
+  parallel, which makes the result meaningless. I’m rerunning those checks
+  sequentially so each case has exclusive access to the evaluation files,
+  matching the real judge behavior.
+
+• Ran printf '' > /workspace/game_state.txt && CONNECT4_EVAL_SIMULATIONS=256 /
+  │ workspace/player.sh && printf 'empty:' && cat /workspace/next_move.txt &&
+  │ printf '\n' && printf '1122334' > /workspace/game_state.txt &&
+  │ … +4 lines
+  └ empty:6
+    terminal:LOSS
+    mid:7
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The sequential validation is clean: terminal histories return LOSS correctly,
+  and nonterminal histories produce legal moves. I’m checking one more thing on
+  the empty board with the full default simulation budget, because opening
+  quality matters disproportionately in Connect 4.
+
+• Ran printf '' > /workspace/game_state.txt && /workspace/player.sh && cat /
+  │ workspace/next_move.txt
+  └ 6
+
+• Ran python3 -m connect4_zero.cli infer-move --checkpoint artifacts/best.pt
+  │ --input game_state.txt --output next_move.txt --simulations 600 --device
+  │ cpu && cat next_move.txt
+  └ 6
+
+• Waited for background terminal · printf '' > /workspace/game_state.txt &&
+python3 -m connect4_zero.cli infer-move --checkpoint artifacts/latest.pt --input
+game_state.txt --output next_move.txt --simulations 5000 --device cpu && cat
+next_move.txt
+
+• Ran printf '' > /workspace/game_state.txt && python3 -m connect4_zero.cli
+  │ infer-move --checkpoint artifacts/latest.pt --input game_state.txt
+  │ --output next_move.txt --simulations 5000 --device cpu && cat
+  │ … +1 lines
+  └ 3
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The opening bias is the one real weakness left. Rather than hard-coding an
+  opening book, I’m fixing it in a way that still stays inside the AlphaZero
+  setup: symmetry-averaging the network over the board and its mirror, which
+  should remove the spurious left/right preference the model is carrying into
+  MCTS.
+
+• Edited connect4_zero/training.py (+7 -4)
+    111              return cached
+    112 -        encoded = torch.from_numpy(state.encode()).unsqueeze(0).to(self
+         .device)
+    112 +        mirrored_state = state.mirrored()
+    113 +        batch = np.stack((state.encode(), mirrored_state.encode()), axi
+         s=0)
+    114 +        encoded = torch.from_numpy(batch).to(self.device)
+    115          with torch.no_grad():
+    116              policy_logits, value = self.model(encoded)
+    115 -            priors = torch.softmax(policy_logits, dim=1)[0].detach().cp
+         u().numpy().astype(np.float32)
+    116 -            scalar_value = float(value.item())
+    117 -        result = (priors, scalar_value)
+    117 +            priors = torch.softmax(policy_logits, dim=1).detach().cpu()
+         .numpy().astype(np.float32)
+    118 +            averaged_priors = 0.5 * (priors[0] + priors[1][::-1])
+    119 +            averaged_value = 0.5 * float(value[0].item() + value[1].ite
+         m())
+    120 +        result = (averaged_priors.astype(np.float32), averaged_value)
+    121          self.cache[state] = result
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m adding one small optimization on top of the symmetry fix: when I evaluate
+  a position and its mirror together, I can cache both results at once. That
+  keeps the symmetric evaluator from doubling work on mirrored states later in
+  the same search.
+
+• Edited connect4_zero/training.py (+2 -0)
+    121          self.cache[state] = result
+    122 +        if mirrored_state != state:
+    123 +            self.cache[mirrored_state] = (np.ascontiguousarray(result[0
+         ][::-1]), averaged_value)
+    124          return result
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The symmetry-averaged evaluator is in. I’m rerunning the test suite first,
+  then I’ll immediately re-check the empty-board move with the trained
+  checkpoint to see whether the mirror fix cleaned up the opening.
+
+• Ran printf '' > /workspace/game_state.txt && python3 -m connect4_zero.cli
+  │ infer-move --checkpoint artifacts/latest.pt --input game_state.txt
+  │ --output next_move.txt --simulations 600 --device cpu && cat /workspace/
+  │ … +1 lines
+  └ 6
+
+• Waited for background terminal · pytest -q
+
+• Ran pytest -q
+  └ ..........................
+    [100%]
+    26 passed in 2.71s
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The symmetry fix helped remove one failure mode, but it wasn’t enough to pull
+  the opening move to center. I’m inspecting the root search statistics on the
+  empty board now so I can see whether the issue is in the prior, the value
+  head, or the final move selection policy.
+
+• Ran python3 - <<'PY'
+  │ from connect4_zero.game import Connect4State
+  │ from connect4_zero.training import load_model_for_inference,
+  │ … +10 lines
+  └ selected 6
+    top [(5, 132, 0.2199999988079071), (1, 131, 0.21833333373069763), (0, 131,
+    0.21833333373069763)]
+    visits [131, 131, 30, 15, 30, 132, 131]
+    root_value -0.023206957485332774
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The empty-board search trace is clear: the network’s opening prior is still
+  too edge-heavy, even after symmetry averaging. I’m correcting that with a
+  small center-weighted opening prior inside MCTS, limited to early plies so it
+  doesn’t interfere with tactical positions later in the game.
+
+• Edited connect4_zero/mcts.py (+3 -0)
+     13  _CENTER_OUT_MOVE_ORDER = (3, 2, 4, 1, 5, 0, 6)
+     14 +_OPENING_CENTER_BIAS = np.asarray([1.0, 1.3, 1.8, 2.5, 1.8, 1.3, 1.0],
+         dtype=np.float32)
+     15
+        ⋮
+    141          masked_priors[allowed_moves] = priors[allowed_moves]
+    142 +        if node.state.move_count < 8:
+    143 +            masked_priors *= _OPENING_CENTER_BIAS
+    144          if masked_priors.sum() <= 0:
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The center-weighted opening prior is in. I’m checking two things only: that
+  the test suite still passes and that the empty-board search now lands on a
+  central move with the trained checkpoint.
+
+• Ran printf '' > /workspace/game_state.txt && python3 -m connect4_zero.cli
+  │ infer-move --checkpoint artifacts/latest.pt --input game_state.txt
+  │ --output next_move.txt --simulations 600 --device cpu && cat /workspace/
+  │ … +1 lines
+  └ 3
+
+• Waited for background terminal · pytest -q
+
+• Ran pytest -q
+  └ ..........................
+    [100%]
+    26 passed in 2.77s
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The opening bias moved inward but not all the way to the center. I’m looking
+  at the root visit split one last time; if center is still just barely behind,
+  a slightly stronger early-ply bias is enough to finish the correction without
+  affecting tactical play later.
+
+• Ran python3 - <<'PY'
+  │ from connect4_zero.game import Connect4State
+  │ from connect4_zero.training import load_model_for_inference,
+  │ … +9 lines
+  └ selected 3
+    top [(2, 126, 0.20999999344348907), (1, 100, 0.1666666716337204), (5, 100,
+    0.1666666716337204)]
+    visits [85, 100, 126, 62, 42, 100, 85]
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’ve got the root split: the model is still favoring the column just left of
+  center. I’m nudging the early-ply center weight up one more step, which is
+  enough to prefer the actual center without hard-coding any move sequence.
+
+• Edited connect4_zero/mcts.py (+1 -1)
+    13  _CENTER_OUT_MOVE_ORDER = (3, 2, 4, 1, 5, 0, 6)
+    14 -_OPENING_CENTER_BIAS = np.asarray([1.0, 1.3, 1.8, 2.5, 1.8, 1.3, 1.0], d
+        type=np.float32)
+    14 +_OPENING_CENTER_BIAS = np.asarray([1.0, 1.4, 2.2, 4.0, 2.2, 1.4, 1.0], d
+        type=np.float32)
+    15
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The last change is just a scalar tweak, but I’m still validating it the same
+  way: full tests, then a direct empty-board inference with the trained
+  checkpoint.
+
+• Ran printf '' > /workspace/game_state.txt && python3 -m connect4_zero.cli
+  │ infer-move --checkpoint artifacts/latest.pt --input game_state.txt
+  │ --output next_move.txt --simulations 600 --device cpu && cat /workspace/
+  │ … +1 lines
+  └ 2
+
+• Ran pytest -q
+  └ ..........................
+    [100%]
+    26 passed in 2.20s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The stronger bias overshot and actually made the opening worse, so I’m not
+  keeping that as-is. I’m inspecting the root visits and then I’ll revert to the
+  previous stable setting rather than shipping a worse opening heuristic.
+
+• Ran python3 - <<'PY'
+  │ from connect4_zero.game import Connect4State
+  │ from connect4_zero.training import load_model_for_inference,
+  │ … +9 lines
+  └ selected 2
+    [98, 119, 47, 73, 47, 119, 97]
+    [(1, 119, 0.19833333790302277), (5, 119, 0.19833333790302277), (0, 98,
+    0.16333332657814026)]
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m reverting the last opening-bias change. The earlier setting was clearly
+  better, and I’d rather ship the stable version and, if needed, spend the
+  remaining budget on more simulations per move rather than a worse heuristic.
+
+• Edited connect4_zero/mcts.py (+1 -1)
+    13  _CENTER_OUT_MOVE_ORDER = (3, 2, 4, 1, 5, 0, 6)
+    14 -_OPENING_CENTER_BIAS = np.asarray([1.0, 1.4, 2.2, 4.0, 2.2, 1.4, 1.0], d
+        type=np.float32)
+    14 +_OPENING_CENTER_BIAS = np.asarray([1.0, 1.3, 1.8, 2.5, 1.8, 1.3, 1.0], d
+        type=np.float32)
+    15
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m validating the reverted setting and then checking whether a higher default
+  simulation budget is enough to push the opening to the actual center without
+  changing the search logic again.
+
+• Ran printf '' > /workspace/game_state.txt && python3 -m connect4_zero.cli
+  │ infer-move --checkpoint artifacts/latest.pt --input game_state.txt
+  │ --output next_move.txt --simulations 600 --device cpu && printf '600:' &&
+  │ … +4 lines
+  └ 600:3
+    2000:5
+
+• Waited for background terminal · pytest -q
+
+• Ran pytest -q
+  └ ..........................
+    [100%]
+    26 passed in 3.67s
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The reverted opening heuristic is back to the better behavior, but more
+  simulations don’t reliably move it to center. I’m doing one quick comparison
+  against the lower-loss checkpoint before I lock the evaluation default, in
+  case the best.pt snapshot has a cleaner opening prior than latest.pt.
+
+• Ran printf '' > /workspace/game_state.txt && python3 -m connect4_zero.cli
+  │ infer-move --checkpoint artifacts/best.pt --input game_state.txt --output
+  │ next_move.txt --simulations 600 --device cpu && printf 'best600:' && cat /
+  │ … +4 lines
+  └ best600:3
+    best2000:5
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The lower-loss snapshot behaves the same on the opening, so there’s no hidden
+  better checkpoint to switch to. I’m doing one last sequential player.sh smoke
+  on terminal and ordinary positions with the final code path, then I’ll update
+  CODEX.md and close out.
+
+• Ran printf '1122334' > /workspace/game_state.txt && /workspace/player.sh &&
+  │ printf 'terminal:' && cat /workspace/next_move.txt && printf '\n' &&
+  │ printf '445566' > /workspace/game_state.txt && /workspace/player.sh &&
+  │ … +1 lines
+  └ terminal:LOSS
+    mid:7
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m updating CODEX.md now with the implementation decisions, training phases,
+  artifact choices, and the one remaining model-quality caveat so the workspace
+  is self-describing for the next pass.
+
+• Explored
+  └ Read CODEX.md
+
+• Edited CODEX.md (+32 -3)
+    11  - Internal row indexing is bottom-up because it matches Connect 4 gravit
+        y and simplifies move application.
+    12 -- The first implementation phase is locking down game correctness with t
+        ests before adding the neural network and training stack.
+    12 +- The first implementation phase locked down game correctness with tests
+         before adding the neural network and training stack.
+    13 +- The network is a small residual policy/value model with `64` channels
+        and `6` residual blocks. This is large enough for Connect 4 structure bu
+        t still cheap enough for repeated single-state inference in MCTS.
+    14 +- Self-play and evaluation default to CPU in the automation scripts. A l
+        ocal benchmark showed that, with batch size `1`, CPU inference was faste
+        r than GPU for this model due to launch overhead.
+    15 +- MCTS uses PUCT, root Dirichlet noise for self-play, tactical pruning f
+        or immediate wins / one-ply blunder avoidance, symmetry-averaged network
+         evaluation, and a mild early-ply center prior.
+    16 +- Checkpoints save after every completed iteration and also after self-p
+        lay if shutdown happens between phases. The payload includes replay buff
+        er contents, optimizer state, scheduler state, RNG state, and pending ph
+        ase metadata.
+    17 +- `latest.pt` is the default checkpoint for play/evaluation. `best.pt` t
+        racks lowest loss only.
+    18
+       ⋮
+    24  - Added the first rule/encoding/rendering tests.
+    25 +- Implemented the residual network, replay buffer, MCTS, trainer, CSV lo
+        gging, checkpointing, resume support, SIGINT handling, model-play CLI, a
+        nd evaluation-time inference path.
+    26 +- Added tests for replay buffer round-trips, tactical MCTS decisions, de
+        adline parsing, nonterminal inference, and checkpoint save/load/resume i
+        dentity.
+    27 +- Added `player.sh` and `setup.sh`.
+    28 +- Ran staged training into `/workspace/artifacts`:
+    29 +- Stage 1: iterations `1-30`, `12` self-play games/iteration, `64` simul
+        ations.
+    30 +- Stage 2: iterations `31-45`, `12` self-play games/iteration, `128` sim
+        ulations.
+    31 +- Stage 3: iterations `46-50`, `8` self-play games/iteration, `192` simu
+        lations.
+    32 +- Final recorded metrics:
+    33 +- Lowest training loss: `1.241694` at iteration `49`.
+    34 +- Final iteration: `50`.
+    35 +- Final replay buffer size: `39872`.
+    36 +- Final learning rate: `0.000125`.
+    37
+       ⋮
+    39
+    23 -- The CLI currently only supports human-vs-human mode.
+    24 -- Training, MCTS, checkpointing, resume logic, and evaluation scripts ar
+        e not implemented yet.
+    40 +- The learned opening is improved but not perfect; on an empty board the
+         search currently prefers a central-adjacent column instead of always ch
+        oosing the solved center opening.
+    41 +- `best.pt` and `latest.pt` are both present. `player.sh` intentionally
+        uses `latest.pt`.
+    42 +- Training logs are buffered when the trainer is launched through a non-
+        interactive shell command, but CSV checkpoints still update incrementall
+        y.
+    43 +
+    44 +## Files Of Interest
+    45 +
+    46 +- `connect4_zero/game.py`: immutable game state, parsing, rendering, sym
+        metry.
+    47 +- `connect4_zero/mcts.py`: PUCT search and tactical/early-opening priors
+        .
+    48 +- `connect4_zero/network.py`: residual policy/value network.
+    49 +- `connect4_zero/replay.py`: ring-buffer replay storage.
+    50 +- `connect4_zero/training.py`: self-play, training loop, checkpointing,
+        inference helpers.
+    51 +- `connect4_zero/cli.py`: terminal entrypoints.
+    52 +- `player.sh`: evaluation entrypoint.
+    53 +- `setup.sh`: evaluation-time preparation / fallback bootstrap.
+
+────────────────────────────────────────────────────────────────────────────────
+
+• One useful final adjustment remains: the self-play policy changed slightly
+  when I added symmetry averaging and the opening prior, but the checkpoint was
+  trained just before that. I’m running a very short adaptation stage so the
+  saved network is aligned with the final search policy rather than leaving that
+  mismatch in place.
+
+• The adaptation stage is short: three more iterations with the final search
+  policy. I’m letting that finish, then I’ll immediately re-check the empty-
+  board move and stop there rather than chasing marginal gains indefinitely.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train
+--iterations 53 --resume artifacts/latest.pt --self-play-games 8 --simulations
+192 --training-steps 96 --batch-size 256 --device cpu --checkpoint-dir artifacts
+
+• Ran python3 -m connect4_zero.cli train --iterations 53 --resume artifacts/
+  │ latest.pt --self-play-games 8 --simulations 192 --training-steps 96
+  │ --batch-size 256 --device cpu --checkpoint-dir artifacts
+  └ Iteration 51: self-play 2/8 games complete.
+    Iteration 51: self-play 4/8 games complete.
+    … +20 lines
+    Iteration 53 complete | loss 1.2250 | policy 1.0213 | value 0.2037 | lr
+    0.000125 | root move 2 | root visits 546.1 | root value 0.011
+
+─ Worked for 1m 24s ────────────────────────────────────────────────────────────
+
+• The adaptation run helped a bit more, ending at 1.2250 on iteration 53. I’m
+  doing the final empty-board check now; if the opening still isn’t the exact
+  center, I’m stopping anyway because the marginal return from more iterations
+  is clearly small.
+
+• Explored
+  └ Read training_log.csv
+
+• Ran printf '' > /workspace/game_state.txt && python3 -m connect4_zero.cli
+  │ infer-move --checkpoint artifacts/latest.pt --input game_state.txt
+  │ --output next_move.txt --simulations 600 --device cpu && printf
+  │ … +4 lines
+  └ latest600:3
+    latest2000:3
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The opening still settles on a central-adjacent column rather than the exact
+  center, even after the adaptation pass, so that’s the plateau. I’m updating
+  CODEX.md one last time with the final iteration count and best loss, then I’ll
+  wrap up with the exact verification results.
+
+• Edited CODEX.md (+4 -3)
+    31  - Stage 3: iterations `46-50`, `8` self-play games/iteration, `192` simu
+        lations.
+    32 +- Adaptation stage: iterations `51-53`, `8` self-play games/iteration, `
+        192` simulations, after enabling symmetry-averaged inference and the fin
+        al opening prior.
+    33  - Final recorded metrics:
+    33 -- Lowest training loss: `1.241694` at iteration `49`.
+    34 -- Final iteration: `50`.
+    35 -- Final replay buffer size: `39872`.
+    34 +- Lowest training loss: `1.224986` at iteration `53`.
+    35 +- Final iteration: `53`.
+    36 +- Final replay buffer size: `41484`.
+    37  - Final learning rate: `0.000125`.
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m doing one last hygiene step before closing out: clearing the temporary
+  game_state.txt and next_move.txt contents from the shell smokes so the
+  workspace isn’t left in a misleading mid-validation state.
+
+• Ran : > /workspace/game_state.txt && : > /workspace/next_move.txt
+  └ (no output)
+
+• Explored
+  └ List player.sh
+
+────────────────────────────────────────────────────────────────────────────────
+
+• Implemented the full project from scratch: terminal Connect 4, AlphaZero-style
+  self-play training, MCTS inference, checkpoint/resume with RNG preservation,
+  SIGINT-aware phase checkpointing, human-vs-model play, and evaluation scripts.
+  The main entrypoints are cli.py, player.sh, setup.sh, and the implementation
+  notes are in CODEX.md.
+
+  Verification is in place. The automated suite passes with 26 tests via
+  test_game.py and test_training_stack.py. Training ran through iteration 53;
+  the final artifacts are latest.pt, best.pt, and training_log.csv. player.sh
+  was smoke-tested sequentially: terminal history 1122334 returns LOSS, and
+  nonterminal histories produce legal moves.
+
+  Residual risk: the trained model is usable but not perfect. On an empty board,
+  the current search still prefers column 3 under the default budget instead of
+  the solved center opening 4. I left player.sh using latest.pt because it
+  reflects the strongest recent search/training state better than lowest-loss
+  alone.
+Token usage: total=123,354 input=52,927 (+ 7,825,664 cached) output=70,427 (reasoning 34,458)
+To continue this session, run codex resume 019d55e7-67b7-7e80-b342-f696de51be9e
+Script done.
+rt1@rt1:~/Documents/phase2/connect4/codexfast_s/t6/init$ 
+

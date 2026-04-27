@@ -1,0 +1,3144 @@
+rt1@rt1:~/Documents/phase2/connect4/codexfast_s/t3/init$ sudo sleep 5490 && sudo ./run.sh
+[+] Building 0.9s (19/19) FINISHED                               docker:default
+ => [internal] load build definition from Dockerfile                       0.0s
+ => => transferring dockerfile: 1.32kB                                     0.0s
+ => [internal] load metadata for docker.io/nvidia/cuda:12.8.0-devel-ubunt  0.8s
+ => [internal] load .dockerignore                                          0.0s
+ => => transferring context: 2B                                            0.0s
+ => [ 1/14] FROM docker.io/nvidia/cuda:12.8.0-devel-ubuntu24.04@sha256:9a  0.0s
+ => [internal] load build context                                          0.0s
+ => => transferring context: 65B                                           0.0s
+ => CACHED [ 2/14] RUN apt-get update && apt-get install -y --no-install-  0.0s
+ => CACHED [ 3/14] RUN curl -fsSL https://deb.nodesource.com/setup_22.x |  0.0s
+ => CACHED [ 4/14] RUN npm install -g @openai/codex                        0.0s
+ => CACHED [ 5/14] RUN pip install --break-system-packages --pre torch --  0.0s
+ => CACHED [ 6/14] RUN pip install --break-system-packages numpy pytest t  0.0s
+ => CACHED [ 7/14] RUN pip install --break-system-packages numpy pytest t  0.0s
+ => CACHED [ 8/14] RUN usermod -l codex -d /home/codex -m ubuntu && group  0.0s
+ => CACHED [ 9/14] RUN mkdir -p /workspace /output && chown codex:codex /  0.0s
+ => CACHED [10/14] COPY squid.conf /etc/squid/squid.conf                   0.0s
+ => CACHED [11/14] RUN mkdir -p /var/log/squid && chown proxy:proxy /var/  0.0s
+ => CACHED [12/14] COPY entrypoint.sh /entrypoint.sh                       0.0s
+ => CACHED [13/14] RUN chmod +x /entrypoint.sh                             0.0s
+ => CACHED [14/14] WORKDIR /workspace                                      0.0s
+ => exporting to image                                                     0.0s
+ => => exporting layers                                                    0.0s
+ => => writing image sha256:f303e8ec7c81f76f83e0c18e582a596a2d1c7afdccd8b  0.0s
+ => => naming to docker.io/library/codex-sandbox                           0.0s
+Waiting for Squid to listen on port 3128... (1/30)
+Squid proxy is ready on port 3128.
+Script started, output log file is '/workspace/session.log'.
+╭─────────────────────────────────────────────────╮
+│ ✨ Update available! 0.111.0 -> 0.118.0         │
+│ Run npm install -g @openai/codex to update.     │
+│                                                 │
+│ See full release notes:                         │
+│ https://github.com/openai/codex/releases/latest │
+╰─────────────────────────────────────────────────╯
+
+╭────────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.111.0)                         │
+│                                                    │
+│ model:     gpt-5.4 xhigh   fast   /model to change │
+│ directory: /workspace                              │
+╰────────────────────────────────────────────────────╯
+
+  Tip: NEW: Use ChatGPT Apps (Connectors) in Codex via $ mentions. Enable in /
+  experimental and restart Codex!
+
+
+› Hi Codex, please complete the project as specified in project_spec.md
+
+
+• I’m reading the repo and project_spec.md first so I can map the spec to the
+  existing code before making changes.
+
+• Ran pwd && rg --files -g 'project_spec.md' -g 'AGENTS.md' -g 'package.json' -g
+  │ 'pyproject.toml' -g 'Cargo.toml' -g 'go.mod' -g 'README*' -g '.gitignore'
+  └ /workspace
+    project_spec.md
+
+• Explored
+  └ List workspace
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The workspace is basically empty apart from the spec, so I’m treating this as
+  a greenfield implementation and extracting the requirements now.
+
+• Explored
+  └ Read project_spec.md
+
+• Ran wc -l project_spec.md
+  └ 94 project_spec.md
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I have the full spec. Next I’m checking for any hidden repo context
+  like .deadline, then I’ll scaffold the project into three tracks: core game
+  engine, training/eval pipeline, and the competition entrypoints.
+
+• Updated Plan
+  └ Greenfield implementation based on project_spec.md. I’m sequencing work so
+    the game rules and persistence are verified first, then training/evaluation
+    layers, then the entrypoints and end-to-end validation.
+    □ Inspect workspace context and establish project structure/CODEX.md
+    □ Implement Connect 4 game engine, terminal UI, and exhaustive tests
+    □ Implement AlphaZero-style model, MCTS, replay buffer, checkpointing,
+      logging, and tests
+    □ Implement training CLI, human-vs-model mode, player.sh/setup.sh entrypoin
+      ts, and resume/SIGINT support
+    □ Run training, validate artifacts, and execute end-to-end tests
+
+• Explored
+  └ List ls -la
+    List workspace
+
+• Ran if [ -f .deadline ]; then sed -n '1,40p' .deadline; else echo '.deadline
+  │ missing'; fi
+  └ Start time: Fri Apr  3 15:55:07 CDT 2026
+    End time: Fri Apr  3 18:55:07 CDT 2026
+
+────────────────────────────────────────────────────────────────────────────────
+
+• /workspace/.deadline is present, so I can enforce the time-bound requirement
+  explicitly while I build. I’m grabbing the current clock and then starting the
+  code scaffold and project log.
+
+• Ran date '+Local %Y-%m-%d %H:%M:%S %Z'
+  └ Local 2026-04-03 15:55:30 CDT
+
+• Ran date -u '+UTC %Y-%m-%d %H:%M:%S'
+  └ UTC 2026-04-03 20:55:30
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’ve got the architecture in mind. Before writing files, I’m checking runtime
+  capabilities so I can size the network and default training settings around
+  the actual hardware in this environment.
+
+• Ran python - <<'PY'
+  │ import torch
+  │ print('torch', torch.__version__)
+  │ … +5 lines
+  └ /bin/bash: line 1: python: command not found
+
+• Ran nproc
+  └ 16
+
+• Ran free -h
+  └                total        used        free      shared  buff/cache
+    available
+    Mem:            30Gi       7.4Gi        15Gi       175Mi       6.1Gi
+    23Gi
+    Swap:          8.0Gi       7.2Gi       835Mi
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The environment exposes python3, not python, so I’m standardizing around that
+  for the repo scripts and tests.
+
+• Ran python3 --version
+  └ Python 3.12.3
+
+• Ran python3 - <<'PY'
+  │ import torch
+  │ print('torch', torch.__version__)
+  │ … +5 lines
+  └ torch 2.12.0.dev20260307+cu128
+    cuda_available True
+    cuda_device_count 1
+    device_name NVIDIA GeForce RTX 5060 Ti
+
+─ Worked for 1m 05s ────────────────────────────────────────────────────────────
+
+• I’m creating the project skeleton now: package, tests, and the project log.
+  After that I’ll land the core Connect 4 engine and run the first test pass
+  before touching training code.
+
+• Ran mkdir -p /workspace/connect4_zero /workspace/tests /workspace/artifacts /
+  │ workspace/checkpoints
+  └ (no output)
+
+• Added CODEX.md (+43 -0)
+     1 +# CODEX Project Log
+     2 +
+     3 +## Objective
+     4 +- Build a fully tested Connect 4 implementation with:
+     5 +  - terminal human-vs-human play
+     6 +  - AlphaZero-style self-play training with MCTS + neural network
+     7 +  - checkpoint/resume support
+     8 +  - human-vs-model play
+     9 +  - `player.sh` competition entrypoint using trained-network-guided MCTS
+    10 +
+    11 +## Time Window
+    12 +- Start: Fri Apr 3 15:55:07 CDT 2026
+    13 +- End: Fri Apr 3 18:55:07 CDT 2026
+    14 +- Current implementation started at: Fri Apr 3 15:55:30 CDT 2026
+    15 +
+    16 +## Initial Decisions
+    17 +- Language/runtime: Python 3.12
+    18 +- ML stack: PyTorch + NumPy only; no extra runtime dependencies required
+    19 +- Board representation: dense 6x7 NumPy array with explicit column heigh
+        ts for correctness and readability
+    20 +- Network: small residual CNN suitable for Connect 4, with policy/value
+        heads
+    21 +- Search: PUCT-style MCTS with root Dirichlet noise for self-play
+    22 +- Persistence: `torch.save` checkpoints containing model/optimizer/sched
+        uler/replay/RNG state
+    23 +- Entry points: `python3 -m connect4_zero.cli ...`, plus `/workspace/pla
+        yer.sh`
+    24 +
+    25 +## Progress
+    26 +- [x] Read `project_spec.md`
+    27 +- [x] Confirm runtime and hardware availability
+    28 +- [ ] Implement core game engine
+    29 +- [ ] Implement tests for game engine
+    30 +- [ ] Implement training stack
+    31 +- [ ] Implement checkpoint/resume and tests
+    32 +- [ ] Implement competition scripts
+    33 +- [ ] Run training and save final artifacts
+    34 +
+    35 +## Environment Notes
+    36 +- `python` is not on PATH; use `python3`
+    37 +- CUDA is available in this workspace (`torch.cuda.is_available() == Tru
+        e`)
+    38 +- Player/evaluation scripts must still work on CPU-only environments
+    39 +
+    40 +## Known Risks / Watch Items
+    41 +- Resume-identical tests must avoid nondeterministic GPU behavior; tests
+         should run on CPU
+    42 +- Competition script must stay comfortably within the 30 second move bud
+        get on CPU
+    43 +- Training strength depends on available runtime before deadline; preser
+        ve the best checkpoint continuously
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m landing the first code slice now: the game engine, a basic terminal CLI
+  for human-vs-human play, the package metadata, and the initial game test
+  suite. Then I’ll run pytest before moving on.
+
+• Edited 5 files (+392 -0)
+  └ connect4_zero/__init__.py (+13 -0)
+     1 +"""Connect 4 AlphaZero-style project."""
+     2 +
+     3 +from .game import COLUMNS, PLAYER_ONE, PLAYER_TWO, ROWS, GameState, Inva
+        lidMoveError
+     4 +
+     5 +__all__ = [
+     6 +    "COLUMNS",
+     7 +    "PLAYER_ONE",
+     8 +    "PLAYER_TWO",
+     9 +    "ROWS",
+    10 +    "GameState",
+    11 +    "InvalidMoveError",
+    12 +]
+    13 +
+
+  └ connect4_zero/cli.py (+64 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +import argparse
+     4 +
+     5 +from .game import GameState, InvalidMoveError
+     6 +
+     7 +
+     8 +def _player_name(player: int) -> str:
+     9 +    return "Player 1 (X)" if player == 1 else "Player 2 (O)"
+    10 +
+    11 +
+    12 +def prompt_human_move(state: GameState) -> int:
+    13 +    while True:
+    14 +        raw_value = input(f"{_player_name(int(state.current_player))}, c
+        hoose column 1-7: ").strip()
+    15 +        if raw_value.lower() in {"q", "quit", "exit"}:
+    16 +            raise SystemExit(0)
+    17 +        if not raw_value.isdigit():
+    18 +            print("Please enter a column number from 1 to 7.")
+    19 +            continue
+    20 +        column = int(raw_value) - 1
+    21 +        try:
+    22 +            if not state.is_legal(column):
+    23 +                raise InvalidMoveError(f"column {column + 1} is not avai
+        lable")
+    24 +            return column
+    25 +        except InvalidMoveError as error:
+    26 +            print(error)
+    27 +
+    28 +
+    29 +def run_human_vs_human() -> int:
+    30 +    state = GameState.initial()
+    31 +    while not state.is_terminal():
+    32 +        print()
+    33 +        print(state.render())
+    34 +        move = prompt_human_move(state)
+    35 +        state.apply_move(move)
+    36 +
+    37 +    print()
+    38 +    print(state.render())
+    39 +    if state.winner == 1:
+    40 +        print("Player 1 (X) wins.")
+    41 +    elif state.winner == -1:
+    42 +        print("Player 2 (O) wins.")
+    43 +    else:
+    44 +        print("Draw.")
+    45 +    return 0
+    46 +
+    47 +
+    48 +def build_parser() -> argparse.ArgumentParser:
+    49 +    parser = argparse.ArgumentParser(description="Connect 4 project CLI"
+        )
+    50 +    subparsers = parser.add_subparsers(dest="command", required=True)
+    51 +    subparsers.add_parser("human", help="Play human vs human in the term
+        inal")
+    52 +    return parser
+    53 +
+    54 +
+    55 +def main() -> int:
+    56 +    args = build_parser().parse_args()
+    57 +    if args.command == "human":
+    58 +        return run_human_vs_human()
+    59 +    raise ValueError(f"unknown command {args.command!r}")
+    60 +
+    61 +
+    62 +if __name__ == "__main__":
+    63 +    raise SystemExit(main())
+    64 +
+
+  └ connect4_zero/game.py (+170 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +from dataclasses import dataclass, field
+      4 +from typing import Iterable
+      5 +
+      6 +import numpy as np
+      7 +
+      8 +ROWS = 6
+      9 +COLUMNS = 7
+     10 +CONNECT_N = 4
+     11 +
+     12 +EMPTY = np.int8(0)
+     13 +PLAYER_ONE = np.int8(1)
+     14 +PLAYER_TWO = np.int8(-1)
+     15 +
+     16 +SYMBOLS = {
+     17 +    int(EMPTY): ".",
+     18 +    int(PLAYER_ONE): "X",
+     19 +    int(PLAYER_TWO): "O",
+     20 +}
+     21 +
+     22 +
+     23 +class InvalidMoveError(ValueError):
+     24 +    """Raised when a move is not legal for the current board."""
+     25 +
+     26 +
+     27 +def parse_history_string(history: str) -> tuple[int, ...]:
+     28 +    """Parse a compact move string like ``443265`` into 0-based columns
+         ."""
+     29 +    if not history:
+     30 +        return ()
+     31 +    moves: list[int] = []
+     32 +    for token in history.strip():
+     33 +        if token < "1" or token > "7":
+     34 +            raise ValueError(f"invalid move token {token!r}; expected d
+         igits 1-7")
+     35 +        moves.append(int(token) - 1)
+     36 +    return tuple(moves)
+     37 +
+     38 +
+     39 +@dataclass(slots=True)
+     40 +class GameState:
+     41 +    """
+     42 +    Connect 4 board state.
+     43 +
+     44 +    The board is stored with row 0 as the bottom row so dropping a piec
+         e means
+     45 +    writing to ``board[heights[column], column]``.
+     46 +    """
+     47 +
+     48 +    board: np.ndarray = field(
+     49 +        default_factory=lambda: np.zeros((ROWS, COLUMNS), dtype=np.int8
+         )
+     50 +    )
+     51 +    heights: np.ndarray = field(default_factory=lambda: np.zeros(COLUMN
+         S, dtype=np.int8))
+     52 +    current_player: np.int8 = PLAYER_ONE
+     53 +    winner: np.int8 = EMPTY
+     54 +    last_move: tuple[int, int] | None = None
+     55 +    history: tuple[int, ...] = ()
+     56 +
+     57 +    @classmethod
+     58 +    def initial(cls) -> "GameState":
+     59 +        return cls()
+     60 +
+     61 +    @classmethod
+     62 +    def from_history(cls, history: str | Iterable[int]) -> "GameState":
+     63 +        state = cls.initial()
+     64 +        moves = parse_history_string(history) if isinstance(history, st
+         r) else tuple(history)
+     65 +        for move in moves:
+     66 +            state.apply_move(int(move))
+     67 +        return state
+     68 +
+     69 +    @property
+     70 +    def move_count(self) -> int:
+     71 +        return len(self.history)
+     72 +
+     73 +    def copy(self) -> "GameState":
+     74 +        return GameState(
+     75 +            board=self.board.copy(),
+     76 +            heights=self.heights.copy(),
+     77 +            current_player=np.int8(self.current_player),
+     78 +            winner=np.int8(self.winner),
+     79 +            last_move=self.last_move,
+     80 +            history=tuple(self.history),
+     81 +        )
+     82 +
+     83 +    def key(self) -> tuple[int, ...]:
+     84 +        return self.history
+     85 +
+     86 +    def is_legal(self, column: int) -> bool:
+     87 +        return 0 <= column < COLUMNS and self.heights[column] < ROWS an
+         d not self.is_terminal()
+     88 +
+     89 +    def legal_moves(self) -> list[int]:
+     90 +        return [column for column in range(COLUMNS) if self.is_legal(co
+         lumn)]
+     91 +
+     92 +    def is_full(self) -> bool:
+     93 +        return self.move_count >= ROWS * COLUMNS
+     94 +
+     95 +    def is_terminal(self) -> bool:
+     96 +        return bool(self.winner) or self.is_full()
+     97 +
+     98 +    def to_history_string(self) -> str:
+     99 +        return "".join(str(move + 1) for move in self.history)
+    100 +
+    101 +    def render(self) -> str:
+    102 +        lines = ["  1 2 3 4 5 6 7"]
+    103 +        for row in range(ROWS - 1, -1, -1):
+    104 +            symbols = " ".join(SYMBOLS[int(self.board[row, column])] fo
+         r column in range(COLUMNS))
+    105 +            lines.append(f"{row + 1} {symbols}")
+    106 +        return "\n".join(lines)
+    107 +
+    108 +    def encode(self) -> np.ndarray:
+    109 +        encoded = np.zeros((3, ROWS, COLUMNS), dtype=np.float32)
+    110 +        encoded[0] = self.board == PLAYER_ONE
+    111 +        encoded[1] = self.board == PLAYER_TWO
+    112 +        encoded[2].fill(1.0 if self.current_player == PLAYER_ONE else 0
+         .0)
+    113 +        return encoded
+    114 +
+    115 +    def terminal_value_for_player(self, player: int) -> float:
+    116 +        if not self.is_terminal():
+    117 +            raise ValueError("terminal value requested for non-terminal
+          state")
+    118 +        if self.winner == EMPTY:
+    119 +            return 0.0
+    120 +        return 1.0 if self.winner == player else -1.0
+    121 +
+    122 +    def apply_move(self, column: int) -> int:
+    123 +        if not 0 <= column < COLUMNS:
+    124 +            raise InvalidMoveError(f"column must be between 1 and {COLU
+         MNS}")
+    125 +        if self.is_terminal():
+    126 +            raise InvalidMoveError("cannot play moves on a finished gam
+         e")
+    127 +        if self.heights[column] >= ROWS:
+    128 +            raise InvalidMoveError(f"column {column + 1} is full")
+    129 +
+    130 +        row = int(self.heights[column])
+    131 +        player = np.int8(self.current_player)
+    132 +        self.board[row, column] = player
+    133 +        self.heights[column] += 1
+    134 +        self.history = (*self.history, column)
+    135 +        self.last_move = (row, column)
+    136 +
+    137 +        if self._is_winning_move(row, column, player):
+    138 +            self.winner = player
+    139 +
+    140 +        self.current_player = np.int8(-player)
+    141 +        return row
+    142 +
+    143 +    def after_move(self, column: int) -> "GameState":
+    144 +        next_state = self.copy()
+    145 +        next_state.apply_move(column)
+    146 +        return next_state
+    147 +
+    148 +    def _is_winning_move(self, row: int, column: int, player: int) -> b
+         ool:
+    149 +        for delta_row, delta_column in ((1, 0), (0, 1), (1, 1), (1, -1)
+         ):
+    150 +            count = 1
+    151 +            count += self._count_direction(row, column, delta_row, delt
+         a_column, player)
+    152 +            count += self._count_direction(row, column, -delta_row, -de
+         lta_column, player)
+    153 +            if count >= CONNECT_N:
+    154 +                return True
+    155 +        return False
+    156 +
+    157 +    def _count_direction(
+    158 +        self, row: int, column: int, delta_row: int, delta_column: int,
+          player: int
+    159 +    ) -> int:
+    160 +        count = 0
+    161 +        cursor_row = row + delta_row
+    162 +        cursor_column = column + delta_column
+    163 +        while 0 <= cursor_row < ROWS and 0 <= cursor_column < COLUMNS:
+    164 +            if self.board[cursor_row, cursor_column] != player:
+    165 +                break
+    166 +            count += 1
+    167 +            cursor_row += delta_row
+    168 +            cursor_column += delta_column
+    169 +        return count
+    170 +
+
+  └ pyproject.toml (+4 -0)
+    1 +[tool.pytest.ini_options]
+    2 +testpaths = ["tests"]
+    3 +pythonpath = ["."]
+    4 +
+
+  └ tests/test_game.py (+141 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import numpy as np
+      4 +import pytest
+      5 +
+      6 +from connect4_zero.game import COLUMNS, PLAYER_ONE, PLAYER_TWO, GameSta
+         te, InvalidMoveError, parse_history_string
+      7 +
+      8 +
+      9 +def test_parse_history_string_accepts_digits_one_to_seven() -> None:
+     10 +    assert parse_history_string("1724") == (0, 6, 1, 3)
+     11 +
+     12 +
+     13 +def test_parse_history_string_rejects_invalid_tokens() -> None:
+     14 +    with pytest.raises(ValueError):
+     15 +        parse_history_string("180")
+     16 +
+     17 +
+     18 +def test_initial_state_properties() -> None:
+     19 +    state = GameState.initial()
+     20 +    assert state.current_player == PLAYER_ONE
+     21 +    assert state.winner == 0
+     22 +    assert state.move_count == 0
+     23 +    assert state.legal_moves() == list(range(COLUMNS))
+     24 +    assert not state.is_terminal()
+     25 +    assert state.to_history_string() == ""
+     26 +    assert np.array_equal(state.board, np.zeros((6, 7), dtype=np.int8))
+     27 +
+     28 +
+     29 +def test_apply_move_places_piece_at_lowest_row_and_switches_player() ->
+          None:
+     30 +    state = GameState.initial()
+     31 +    row = state.apply_move(2)
+     32 +    assert row == 0
+     33 +    assert state.board[0, 2] == PLAYER_ONE
+     34 +    assert state.current_player == PLAYER_TWO
+     35 +
+     36 +    second_row = state.apply_move(2)
+     37 +    assert second_row == 1
+     38 +    assert state.board[1, 2] == PLAYER_TWO
+     39 +    assert state.current_player == PLAYER_ONE
+     40 +
+     41 +
+     42 +def test_apply_move_rejects_out_of_range_and_full_columns() -> None:
+     43 +    state = GameState.initial()
+     44 +    with pytest.raises(InvalidMoveError):
+     45 +        state.apply_move(-1)
+     46 +    with pytest.raises(InvalidMoveError):
+     47 +        state.apply_move(7)
+     48 +
+     49 +    for _ in range(6):
+     50 +        state.apply_move(0)
+     51 +    with pytest.raises(InvalidMoveError):
+     52 +        state.apply_move(0)
+     53 +
+     54 +
+     55 +def test_horizontal_win_detection() -> None:
+     56 +    state = GameState.initial()
+     57 +    for move in (0, 0, 1, 1, 2, 2, 3):
+     58 +        state.apply_move(move)
+     59 +    assert state.winner == PLAYER_ONE
+     60 +    assert state.is_terminal()
+     61 +    assert state.terminal_value_for_player(PLAYER_ONE) == 1.0
+     62 +    assert state.terminal_value_for_player(PLAYER_TWO) == -1.0
+     63 +
+     64 +
+     65 +def test_vertical_win_detection() -> None:
+     66 +    state = GameState.initial()
+     67 +    for move in (0, 1, 0, 1, 0, 1, 0):
+     68 +        state.apply_move(move)
+     69 +    assert state.winner == PLAYER_ONE
+     70 +    assert state.is_terminal()
+     71 +
+     72 +
+     73 +def test_positive_diagonal_win_detection() -> None:
+     74 +    state = GameState.initial()
+     75 +    for move in (0, 1, 1, 2, 3, 2, 2, 3, 4, 3, 3):
+     76 +        state.apply_move(move)
+     77 +    assert state.winner == PLAYER_ONE
+     78 +
+     79 +
+     80 +def test_negative_diagonal_win_detection() -> None:
+     81 +    state = GameState.initial()
+     82 +    for move in (3, 2, 2, 1, 0, 1, 1, 0, 4, 0, 0):
+     83 +        state.apply_move(move)
+     84 +    assert state.winner == PLAYER_ONE
+     85 +
+     86 +
+     87 +def test_from_history_reconstructs_board() -> None:
+     88 +    state = GameState.from_history("112233")
+     89 +    assert state.move_count == 6
+     90 +    assert state.history == (0, 0, 1, 1, 2, 2)
+     91 +    assert state.board[0, 0] == PLAYER_ONE
+     92 +    assert state.board[1, 0] == PLAYER_TWO
+     93 +
+     94 +
+     95 +def test_render_shows_column_labels_and_bottom_row_number() -> None:
+     96 +    state = GameState.from_history("112233")
+     97 +    rendered = state.render().splitlines()
+     98 +    assert rendered[0] == "  1 2 3 4 5 6 7"
+     99 +    assert rendered[-1].startswith("1 ")
+    100 +
+    101 +
+    102 +def test_encode_marks_piece_planes_and_current_player_plane() -> None:
+    103 +    state = GameState.from_history("12")
+    104 +    encoded = state.encode()
+    105 +    assert encoded.shape == (3, 6, 7)
+    106 +    assert encoded[0, 0, 0] == 1.0
+    107 +    assert encoded[1, 0, 1] == 1.0
+    108 +    assert np.all(encoded[2] == 1.0)
+    109 +
+    110 +
+    111 +def test_full_non_winning_board_counts_as_draw() -> None:
+    112 +    board = np.array(
+    113 +        [
+    114 +            [1, 1, -1, -1, 1, 1, -1],
+    115 +            [-1, -1, 1, 1, -1, -1, 1],
+    116 +            [1, 1, -1, -1, 1, 1, -1],
+    117 +            [-1, -1, 1, 1, -1, -1, 1],
+    118 +            [1, 1, -1, -1, 1, 1, -1],
+    119 +            [-1, -1, 1, 1, -1, -1, 1],
+    120 +        ],
+    121 +        dtype=np.int8,
+    122 +    )
+    123 +    state = GameState(
+    124 +        board=board,
+    125 +        heights=np.full(7, 6, dtype=np.int8),
+    126 +        current_player=PLAYER_ONE,
+    127 +        winner=0,
+    128 +        history=tuple(),
+    129 +    )
+    130 +    assert state.is_full()
+    131 +    assert state.is_terminal()
+    132 +    assert state.winner == 0
+    133 +    assert state.terminal_value_for_player(PLAYER_ONE) == 0.0
+    134 +
+    135 +
+    136 +def test_terminal_position_rejects_additional_moves() -> None:
+    137 +    state = GameState.initial()
+    138 +    for move in (0, 0, 1, 1, 2, 2, 3):
+    139 +        state.apply_move(move)
+    140 +    with pytest.raises(InvalidMoveError):
+    141 +        state.apply_move(4)
+
+• Ran pytest -q tests/test_game.py
+  └ ............F.
+    [100%]
+    … +33 lines
+    asser...
+    1 failed, 13 passed in 0.10s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• is_full() was too tightly coupled to move history instead of actual board
+  occupancy. I’m fixing that now so constructed states and loaded positions
+  behave correctly, then rerunning the game tests.
+
+• Edited connect4_zero/game.py (+1 -2)
+     92      def is_full(self) -> bool:
+     93 -        return self.move_count >= ROWS * COLUMNS
+     93 +        return bool(np.all(self.heights >= ROWS))
+     94
+        ⋮
+    169          return count
+    170 -
+
+• Ran pytest -q tests/test_game.py
+  └
+    14 passed in 0.07s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The game engine and the initial terminal mode are in place, and the first test
+  pass is clean. I’m moving into the training stack now: network, MCTS, replay
+  buffer, checkpointing, and the CLI modes that sit on top of them.
+
+• Updated Plan
+  └ Core board logic is implemented and verified. Next I’m building the model/
+    search/training pipeline and its persistence guarantees, then I’ll wire the
+    human/model and competition entrypoints on top.
+    ✔ Inspect workspace context and establish project structure/CODEX.md
+    ✔ Implement Connect 4 game engine, terminal UI, and exhaustive tests
+    □ Implement AlphaZero-style model, MCTS, replay buffer, checkpointing,
+      logging, and tests
+    □ Implement training CLI, human-vs-model mode, player.sh/setup.sh entrypoin
+      ts, and resume/SIGINT support
+    □ Run training, validate artifacts, and execute end-to-end tests
+
+• I’m editing the training core now. This adds the residual network, MCTS,
+  replay buffer, checkpointable trainer state, and tests that cover search
+  behavior and save/load determinism on CPU.
+
+• Edited 5 files (+956 -0)
+  └ connect4_zero/mcts.py (+239 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import math
+      4 +from dataclasses import dataclass, field
+      5 +
+      6 +import numpy as np
+      7 +import torch
+      8 +
+      9 +from .game import COLUMNS, GameState
+     10 +
+     11 +
+     12 +@dataclass(slots=True)
+     13 +class MCTSConfig:
+     14 +    simulations: int = 128
+     15 +    c_puct: float = 1.7
+     16 +    dirichlet_alpha: float = 0.35
+     17 +    dirichlet_epsilon: float = 0.25
+     18 +
+     19 +
+     20 +@dataclass(slots=True)
+     21 +class TreeNode:
+     22 +    prior: float
+     23 +    visit_count: int = 0
+     24 +    value_sum: float = 0.0
+     25 +    state_key: tuple[int, ...] | None = None
+     26 +    children: dict[int, "TreeNode"] = field(default_factory=dict)
+     27 +
+     28 +    @property
+     29 +    def expanded(self) -> bool:
+     30 +        return bool(self.children)
+     31 +
+     32 +    def value(self) -> float:
+     33 +        if self.visit_count == 0:
+     34 +            return 0.0
+     35 +        return self.value_sum / self.visit_count
+     36 +
+     37 +
+     38 +@dataclass(slots=True)
+     39 +class ChildStats:
+     40 +    move: int
+     41 +    visits: int
+     42 +    prior: float
+     43 +    value: float
+     44 +
+     45 +
+     46 +@dataclass(slots=True)
+     47 +class SearchResult:
+     48 +    selected_action: int | None
+     49 +    visit_policy: np.ndarray
+     50 +    visit_counts: np.ndarray
+     51 +    root_value: float
+     52 +    root_visit_count: int
+     53 +    most_visited_move: int | None
+     54 +    child_stats: list[ChildStats]
+     55 +    root: TreeNode
+     56 +
+     57 +
+     58 +class MCTS:
+     59 +    def __init__(
+     60 +        self,
+     61 +        model: torch.nn.Module,
+     62 +        config: MCTSConfig,
+     63 +        device: torch.device | str,
+     64 +        rng: np.random.Generator,
+     65 +    ) -> None:
+     66 +        self.model = model
+     67 +        self.config = config
+     68 +        self.device = torch.device(device)
+     69 +        self.rng = rng
+     70 +
+     71 +    def run(
+     72 +        self,
+     73 +        root_state: GameState,
+     74 +        *,
+     75 +        add_exploration_noise: bool,
+     76 +        temperature: float,
+     77 +        root: TreeNode | None = None,
+     78 +    ) -> SearchResult:
+     79 +        if root_state.is_terminal():
+     80 +            empty_policy = np.zeros(COLUMNS, dtype=np.float32)
+     81 +            return SearchResult(
+     82 +                selected_action=None,
+     83 +                visit_policy=empty_policy,
+     84 +                visit_counts=empty_policy.astype(np.int32),
+     85 +                root_value=root_state.terminal_value_for_player(int(roo
+         t_state.current_player)),
+     86 +                root_visit_count=0,
+     87 +                most_visited_move=None,
+     88 +                child_stats=[],
+     89 +                root=TreeNode(prior=1.0, state_key=root_state.key()),
+     90 +            )
+     91 +
+     92 +        if root is None or root.state_key != root_state.key():
+     93 +            root = TreeNode(prior=1.0, state_key=root_state.key())
+     94 +            self._expand(root, root_state)
+     95 +
+     96 +        if add_exploration_noise and root.children:
+     97 +            self._apply_dirichlet_noise(root)
+     98 +
+     99 +        for _ in range(self.config.simulations):
+    100 +            node = root
+    101 +            state = root_state.copy()
+    102 +            path = [node]
+    103 +
+    104 +            while node.expanded and not state.is_terminal():
+    105 +                action, child = self._select_child(node)
+    106 +                state.apply_move(action)
+    107 +                node = child
+    108 +                path.append(node)
+    109 +
+    110 +            if state.is_terminal():
+    111 +                leaf_value = state.terminal_value_for_player(int(state.
+         current_player))
+    112 +            else:
+    113 +                leaf_value = self._expand(node, state)
+    114 +
+    115 +            self._backpropagate(path, leaf_value)
+    116 +
+    117 +        visit_counts = np.zeros(COLUMNS, dtype=np.float32)
+    118 +        for action, child in root.children.items():
+    119 +            visit_counts[action] = child.visit_count
+    120 +
+    121 +        policy = self._policy_from_visits(visit_counts, temperature)
+    122 +        selected_action = self._select_action(policy, visit_counts)
+    123 +        child_stats = [
+    124 +            ChildStats(move=move, visits=child.visit_count, prior=child
+         .prior, value=child.value())
+    125 +            for move, child in sorted(root.children.items(), key=lambda
+          item: item[0])
+    126 +        ]
+    127 +        most_visited_move = int(np.argmax(visit_counts)) if visit_count
+         s.sum() > 0 else None
+    128 +
+    129 +        return SearchResult(
+    130 +            selected_action=selected_action,
+    131 +            visit_policy=policy,
+    132 +            visit_counts=visit_counts.astype(np.int32),
+    133 +            root_value=root.value(),
+    134 +            root_visit_count=root.visit_count,
+    135 +            most_visited_move=most_visited_move,
+    136 +            child_stats=sorted(child_stats, key=lambda item: item.visit
+         s, reverse=True),
+    137 +            root=root,
+    138 +        )
+    139 +
+    140 +    def _expand(self, node: TreeNode, state: GameState) -> float:
+    141 +        node.state_key = state.key()
+    142 +        logits, value = self._evaluate(state)
+    143 +        legal_moves = state.legal_moves()
+    144 +        priors = _masked_softmax(logits, legal_moves)
+    145 +        node.children = {
+    146 +            action: TreeNode(prior=float(priors[action]))
+    147 +            for action in legal_moves
+    148 +        }
+    149 +        return value
+    150 +
+    151 +    def _evaluate(self, state: GameState) -> tuple[np.ndarray, float]:
+    152 +        self.model.eval()
+    153 +        with torch.no_grad():
+    154 +            encoded = torch.from_numpy(state.encode()).unsqueeze(0).to(
+         self.device)
+    155 +            policy_logits, value = self.model(encoded)
+    156 +        return policy_logits[0].detach().cpu().numpy(), float(value.ite
+         m())
+    157 +
+    158 +    def _apply_dirichlet_noise(self, root: TreeNode) -> None:
+    159 +        actions = list(root.children.keys())
+    160 +        if not actions:
+    161 +            return
+    162 +        noise = self.rng.dirichlet(np.full(len(actions), self.config.di
+         richlet_alpha, dtype=np.float32))
+    163 +        epsilon = self.config.dirichlet_epsilon
+    164 +        for action, sample in zip(actions, noise, strict=True):
+    165 +            child = root.children[action]
+    166 +            child.prior = float((1.0 - epsilon) * child.prior + epsilon
+          * sample)
+    167 +
+    168 +    def _select_child(self, node: TreeNode) -> tuple[int, TreeNode]:
+    169 +        sqrt_visits = math.sqrt(max(1, node.visit_count))
+    170 +        best_action = -1
+    171 +        best_child: TreeNode | None = None
+    172 +        best_score = -float("inf")
+    173 +
+    174 +        for action in _center_ordered_moves(node.children.keys()):
+    175 +            child = node.children[action]
+    176 +            q_value = -child.value()
+    177 +            u_value = self.config.c_puct * child.prior * sqrt_visits /
+         (1 + child.visit_count)
+    178 +            score = q_value + u_value
+    179 +            if score > best_score:
+    180 +                best_score = score
+    181 +                best_action = action
+    182 +                best_child = child
+    183 +
+    184 +        if best_child is None:
+    185 +            raise RuntimeError("attempted to select a child from an emp
+         ty node")
+    186 +        return best_action, best_child
+    187 +
+    188 +    def _backpropagate(self, path: list[TreeNode], leaf_value: float) -
+         > None:
+    189 +        value = leaf_value
+    190 +        for node in reversed(path):
+    191 +            node.visit_count += 1
+    192 +            node.value_sum += value
+    193 +            value = -value
+    194 +
+    195 +    def _policy_from_visits(self, visit_counts: np.ndarray, temperature
+         : float) -> np.ndarray:
+    196 +        if visit_counts.sum() <= 0:
+    197 +            return np.zeros_like(visit_counts, dtype=np.float32)
+    198 +        if temperature <= 1e-6:
+    199 +            policy = np.zeros_like(visit_counts, dtype=np.float32)
+    200 +            policy[int(np.argmax(visit_counts))] = 1.0
+    201 +            return policy
+    202 +        scaled = np.power(visit_counts, 1.0 / temperature, where=visit_
+         counts > 0)
+    203 +        total = float(scaled.sum())
+    204 +        if total <= 0:
+    205 +            policy = np.zeros_like(visit_counts, dtype=np.float32)
+    206 +            policy[int(np.argmax(visit_counts))] = 1.0
+    207 +            return policy
+    208 +        return (scaled / total).astype(np.float32)
+    209 +
+    210 +    def _select_action(self, policy: np.ndarray, visit_counts: np.ndarr
+         ay) -> int | None:
+    211 +        if policy.sum() <= 0:
+    212 +            legal = np.flatnonzero(visit_counts >= 0)
+    213 +            if legal.size == 0:
+    214 +                return None
+    215 +            return int(legal[0])
+    216 +        if np.count_nonzero(policy) == 1:
+    217 +            return int(np.argmax(policy))
+    218 +        return int(self.rng.choice(np.arange(COLUMNS), p=policy))
+    219 +
+    220 +
+    221 +def _masked_softmax(logits: np.ndarray, legal_moves: list[int]) -> np.n
+         darray:
+    222 +    masked = np.full(COLUMNS, -np.inf, dtype=np.float32)
+    223 +    masked[legal_moves] = logits[legal_moves]
+    224 +    max_logit = np.max(masked[legal_moves])
+    225 +    exp_values = np.zeros(COLUMNS, dtype=np.float32)
+    226 +    exp_values[legal_moves] = np.exp(masked[legal_moves] - max_logit)
+    227 +    total = float(exp_values[legal_moves].sum())
+    228 +    if total <= 0:
+    229 +        uniform = np.zeros(COLUMNS, dtype=np.float32)
+    230 +        uniform[legal_moves] = 1.0 / len(legal_moves)
+    231 +        return uniform
+    232 +    return exp_values / total
+    233 +
+    234 +
+    235 +def _center_ordered_moves(actions: list[int] | tuple[int, ...] | set[in
+         t]) -> list[int]:
+    236 +    center_priority = [3, 2, 4, 1, 5, 0, 6]
+    237 +    action_set = set(actions)
+    238 +    return [action for action in center_priority if action in action_se
+         t]
+    239 +
+
+  └ connect4_zero/network.py (+79 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +from dataclasses import dataclass
+     4 +
+     5 +import torch
+     6 +from torch import nn
+     7 +
+     8 +from .game import COLUMNS, ROWS
+     9 +
+    10 +
+    11 +@dataclass(slots=True)
+    12 +class NetworkConfig:
+    13 +    channels: int = 64
+    14 +    residual_blocks: int = 6
+    15 +
+    16 +
+    17 +class ResidualBlock(nn.Module):
+    18 +    def __init__(self, channels: int) -> None:
+    19 +        super().__init__()
+    20 +        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, paddin
+        g=1, bias=False)
+    21 +        self.bn1 = nn.BatchNorm2d(channels)
+    22 +        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, paddin
+        g=1, bias=False)
+    23 +        self.bn2 = nn.BatchNorm2d(channels)
+    24 +        self.relu = nn.ReLU(inplace=True)
+    25 +
+    26 +    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    27 +        residual = x
+    28 +        x = self.relu(self.bn1(self.conv1(x)))
+    29 +        x = self.bn2(self.conv2(x))
+    30 +        x = self.relu(x + residual)
+    31 +        return x
+    32 +
+    33 +
+    34 +class Connect4Net(nn.Module):
+    35 +    def __init__(self, config: NetworkConfig) -> None:
+    36 +        super().__init__()
+    37 +        self.config = config
+    38 +        channels = config.channels
+    39 +
+    40 +        self.stem = nn.Sequential(
+    41 +            nn.Conv2d(3, channels, kernel_size=3, padding=1, bias=False)
+        ,
+    42 +            nn.BatchNorm2d(channels),
+    43 +            nn.ReLU(inplace=True),
+    44 +        )
+    45 +        self.residual_tower = nn.Sequential(
+    46 +            *(ResidualBlock(channels) for _ in range(config.residual_blo
+        cks))
+    47 +        )
+    48 +
+    49 +        self.policy_head = nn.Sequential(
+    50 +            nn.Conv2d(channels, 2, kernel_size=1, bias=False),
+    51 +            nn.BatchNorm2d(2),
+    52 +            nn.ReLU(inplace=True),
+    53 +        )
+    54 +        self.policy_linear = nn.Linear(2 * ROWS * COLUMNS, COLUMNS)
+    55 +
+    56 +        self.value_head = nn.Sequential(
+    57 +            nn.Conv2d(channels, 1, kernel_size=1, bias=False),
+    58 +            nn.BatchNorm2d(1),
+    59 +            nn.ReLU(inplace=True),
+    60 +        )
+    61 +        self.value_hidden = nn.Linear(ROWS * COLUMNS, channels)
+    62 +        self.value_linear = nn.Linear(channels, 1)
+    63 +        self.relu = nn.ReLU(inplace=True)
+    64 +        self.tanh = nn.Tanh()
+    65 +
+    66 +    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tens
+        or]:
+    67 +        x = self.residual_tower(self.stem(x))
+    68 +
+    69 +        policy = self.policy_head(x)
+    70 +        policy = policy.flatten(start_dim=1)
+    71 +        policy_logits = self.policy_linear(policy)
+    72 +
+    73 +        value = self.value_head(x)
+    74 +        value = value.flatten(start_dim=1)
+    75 +        value = self.relu(self.value_hidden(value))
+    76 +        value = self.tanh(self.value_linear(value)).squeeze(-1)
+    77 +
+    78 +        return policy_logits, value
+    79 +
+
+  └ connect4_zero/replay.py (+90 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +from collections import deque
+     4 +from dataclasses import dataclass
+     5 +from typing import Iterable
+     6 +
+     7 +import numpy as np
+     8 +
+     9 +from .game import COLUMNS, ROWS
+    10 +
+    11 +
+    12 +@dataclass(slots=True)
+    13 +class ReplayExample:
+    14 +    state: np.ndarray
+    15 +    policy: np.ndarray
+    16 +    value: float
+    17 +
+    18 +
+    19 +class ReplayBuffer:
+    20 +    def __init__(self, capacity: int) -> None:
+    21 +        if capacity <= 0:
+    22 +            raise ValueError("capacity must be positive")
+    23 +        self.capacity = capacity
+    24 +        self._storage: deque[ReplayExample] = deque(maxlen=capacity)
+    25 +        self.total_added = 0
+    26 +
+    27 +    def __len__(self) -> int:
+    28 +        return len(self._storage)
+    29 +
+    30 +    def extend(self, examples: Iterable[ReplayExample]) -> int:
+    31 +        overwritten = 0
+    32 +        for example in examples:
+    33 +            if len(self._storage) == self.capacity:
+    34 +                overwritten += 1
+    35 +            self._storage.append(
+    36 +                ReplayExample(
+    37 +                    state=np.asarray(example.state, dtype=np.float32).co
+        py(),
+    38 +                    policy=np.asarray(example.policy, dtype=np.float32).
+        copy(),
+    39 +                    value=float(example.value),
+    40 +                )
+    41 +            )
+    42 +            self.total_added += 1
+    43 +        return overwritten
+    44 +
+    45 +    def sample(
+    46 +        self, batch_size: int, rng: np.random.Generator
+    47 +    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    48 +        if not self._storage:
+    49 +            raise ValueError("cannot sample from an empty replay buffer"
+        )
+    50 +        indices = rng.integers(0, len(self._storage), size=batch_size)
+    51 +        states = np.stack([self._storage[int(index)].state for index in
+        indices]).astype(
+    52 +            np.float32, copy=False
+    53 +        )
+    54 +        policies = np.stack([self._storage[int(index)].policy for index
+        in indices]).astype(
+    55 +            np.float32, copy=False
+    56 +        )
+    57 +        values = np.asarray([self._storage[int(index)].value for index i
+        n indices], dtype=np.float32)
+    58 +        return states, policies, values
+    59 +
+    60 +    def state_dict(self) -> dict[str, object]:
+    61 +        if self._storage:
+    62 +            states = np.stack([example.state for example in self._storag
+        e]).astype(np.float32, copy=False)
+    63 +            policies = np.stack([example.policy for example in self._sto
+        rage]).astype(np.float32, copy=False)
+    64 +            values = np.asarray([example.value for example in self._stor
+        age], dtype=np.float32)
+    65 +        else:
+    66 +            states = np.zeros((0, 3, ROWS, COLUMNS), dtype=np.float32)
+    67 +            policies = np.zeros((0, COLUMNS), dtype=np.float32)
+    68 +            values = np.zeros((0,), dtype=np.float32)
+    69 +        return {
+    70 +            "capacity": self.capacity,
+    71 +            "states": states,
+    72 +            "policies": policies,
+    73 +            "values": values,
+    74 +            "total_added": self.total_added,
+    75 +        }
+    76 +
+    77 +    @classmethod
+    78 +    def from_state_dict(cls, state: dict[str, object]) -> "ReplayBuffer"
+        :
+    79 +        buffer = cls(capacity=int(state["capacity"]))
+    80 +        states = np.asarray(state["states"], dtype=np.float32)
+    81 +        policies = np.asarray(state["policies"], dtype=np.float32)
+    82 +        values = np.asarray(state["values"], dtype=np.float32)
+    83 +        examples = (
+    84 +            ReplayExample(state=single_state, policy=single_policy, valu
+        e=float(single_value))
+    85 +            for single_state, single_policy, single_value in zip(states,
+         policies, values, strict=True)
+    86 +        )
+    87 +        buffer.extend(examples)
+    88 +        buffer.total_added = int(state["total_added"])
+    89 +        return buffer
+    90 +
+
+  └ connect4_zero/training.py (+420 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import csv
+      4 +import random
+      5 +import signal
+      6 +import time
+      7 +from dataclasses import asdict, dataclass
+      8 +from datetime import datetime
+      9 +from pathlib import Path
+     10 +from typing import Any
+     11 +
+     12 +import numpy as np
+     13 +import torch
+     14 +import torch.nn.functional as F
+     15 +from torch.optim import AdamW
+     16 +from torch.optim.lr_scheduler import StepLR
+     17 +
+     18 +from .game import GameState, PLAYER_ONE, PLAYER_TWO
+     19 +from .mcts import MCTS, MCTSConfig, SearchResult
+     20 +from .network import Connect4Net, NetworkConfig
+     21 +from .replay import ReplayBuffer, ReplayExample
+     22 +
+     23 +
+     24 +@dataclass(slots=True)
+     25 +class SelfPlayConfig:
+     26 +    games_per_iteration: int = 32
+     27 +    simulations_per_move: int = 96
+     28 +    temperature: float = 1.0
+     29 +    temperature_moves: int = 8
+     30 +    evaluation_simulations: int = 256
+     31 +
+     32 +
+     33 +@dataclass(slots=True)
+     34 +class TrainingConfig:
+     35 +    device: str = "cuda" if torch.cuda.is_available() else "cpu"
+     36 +    seed: int = 7
+     37 +    batch_size: int = 256
+     38 +    steps_per_iteration: int = 128
+     39 +    min_buffer_size: int = 512
+     40 +    buffer_capacity: int = 200_000
+     41 +    learning_rate: float = 1e-3
+     42 +    weight_decay: float = 1e-4
+     43 +    gradient_clip_norm: float = 1.0
+     44 +    lr_step_size: int = 10
+     45 +    lr_gamma: float = 0.7
+     46 +    checkpoint_every: int = 1
+     47 +    checkpoint_dir: str = "checkpoints"
+     48 +    log_csv_path: str = "artifacts/training_log.csv"
+     49 +    best_checkpoint_name: str = "best.pt"
+     50 +    latest_checkpoint_name: str = "latest.pt"
+     51 +
+     52 +
+     53 +@dataclass(slots=True)
+     54 +class IterationMetrics:
+     55 +    iteration: int
+     56 +    wall_clock: str
+     57 +    total_loss: float
+     58 +    policy_loss: float
+     59 +    value_loss: float
+     60 +    learning_rate: float
+     61 +    root_best_move: int
+     62 +    root_visit_count: int
+     63 +    root_value_estimate: float
+     64 +    x_win_rate: float
+     65 +    o_win_rate: float
+     66 +    draw_rate: float
+     67 +    average_game_length: float
+     68 +    replay_buffer_size: int
+     69 +    replay_turnover_rate: float
+     70 +    generated_examples: int
+     71 +    selfplay_seconds: float
+     72 +    train_seconds: float
+     73 +
+     74 +
+     75 +class CSVLogger:
+     76 +    def __init__(self, path: str | Path) -> None:
+     77 +        self.path = Path(path)
+     78 +        self.path.parent.mkdir(parents=True, exist_ok=True)
+     79 +        self._header_written = self.path.exists() and self.path.stat().
+         st_size > 0
+     80 +
+     81 +    def log(self, metrics: IterationMetrics) -> None:
+     82 +        row = asdict(metrics)
+     83 +        with self.path.open("a", newline="", encoding="utf-8") as handl
+         e:
+     84 +            writer = csv.DictWriter(handle, fieldnames=list(row.keys())
+         )
+     85 +            if not self._header_written:
+     86 +                writer.writeheader()
+     87 +                self._header_written = True
+     88 +            writer.writerow(row)
+     89 +
+     90 +
+     91 +class ShutdownHandler:
+     92 +    def __init__(self) -> None:
+     93 +        self.stop_requested = False
+     94 +        self._previous = signal.getsignal(signal.SIGINT)
+     95 +
+     96 +    def install(self) -> None:
+     97 +        signal.signal(signal.SIGINT, self._handle_signal)
+     98 +
+     99 +    def restore(self) -> None:
+    100 +        signal.signal(signal.SIGINT, self._previous)
+    101 +
+    102 +    def _handle_signal(self, signum: int, frame: Any) -> None:  # pragm
+         a: no cover - signal plumbing
+    103 +        del signum, frame
+    104 +        self.stop_requested = True
+    105 +        print("SIGINT received; finishing the current phase before chec
+         kpointing and exiting.")
+    106 +
+    107 +
+    108 +class Trainer:
+    109 +    def __init__(
+    110 +        self,
+    111 +        *,
+    112 +        network_config: NetworkConfig | None = None,
+    113 +        mcts_config: MCTSConfig | None = None,
+    114 +        selfplay_config: SelfPlayConfig | None = None,
+    115 +        training_config: TrainingConfig | None = None,
+    116 +    ) -> None:
+    117 +        self.network_config = network_config or NetworkConfig()
+    118 +        self.mcts_config = mcts_config or MCTSConfig()
+    119 +        self.selfplay_config = selfplay_config or SelfPlayConfig()
+    120 +        self.training_config = training_config or TrainingConfig()
+    121 +
+    122 +        self.device = torch.device(self.training_config.device)
+    123 +        self.rng = np.random.default_rng(self.training_config.seed)
+    124 +        random.seed(self.training_config.seed)
+    125 +        np.random.seed(self.training_config.seed)
+    126 +        torch.manual_seed(self.training_config.seed)
+    127 +        if torch.cuda.is_available():
+    128 +            torch.cuda.manual_seed_all(self.training_config.seed)
+    129 +
+    130 +        self.model = Connect4Net(self.network_config).to(self.device)
+    131 +        self.optimizer = AdamW(
+    132 +            self.model.parameters(),
+    133 +            lr=self.training_config.learning_rate,
+    134 +            weight_decay=self.training_config.weight_decay,
+    135 +        )
+    136 +        self.scheduler = StepLR(
+    137 +            self.optimizer,
+    138 +            step_size=self.training_config.lr_step_size,
+    139 +            gamma=self.training_config.lr_gamma,
+    140 +        )
+    141 +        self.replay_buffer = ReplayBuffer(self.training_config.buffer_c
+         apacity)
+    142 +        self.iteration = 0
+    143 +        self.best_loss = float("inf")
+    144 +        self.csv_logger = CSVLogger(self.training_config.log_csv_path)
+    145 +
+    146 +    def populate_replay_from_games(self, num_games: int, *, add_noise:
+         bool = True) -> dict[str, float]:
+    147 +        size_before = len(self.replay_buffer)
+    148 +        examples: list[ReplayExample] = []
+    149 +        x_wins = 0
+    150 +        o_wins = 0
+    151 +        draws = 0
+    152 +        move_counts: list[int] = []
+    153 +
+    154 +        for _ in range(num_games):
+    155 +            game_examples, winner, move_count = self._generate_self_pla
+         y_game(add_noise=add_noise)
+    156 +            examples.extend(game_examples)
+    157 +            move_counts.append(move_count)
+    158 +            if winner == PLAYER_ONE:
+    159 +                x_wins += 1
+    160 +            elif winner == PLAYER_TWO:
+    161 +                o_wins += 1
+    162 +            else:
+    163 +                draws += 1
+    164 +
+    165 +        overwritten = self.replay_buffer.extend(examples)
+    166 +        base = max(1, size_before)
+    167 +        turnover = overwritten / base
+    168 +        total_games = max(1, num_games)
+    169 +        return {
+    170 +            "x_win_rate": x_wins / total_games,
+    171 +            "o_win_rate": o_wins / total_games,
+    172 +            "draw_rate": draws / total_games,
+    173 +            "average_game_length": float(np.mean(move_counts)) if move_
+         counts else 0.0,
+    174 +            "replay_turnover_rate": turnover,
+    175 +            "generated_examples": len(examples),
+    176 +        }
+    177 +
+    178 +    def _generate_self_play_game(self, *, add_noise: bool) -> tuple[lis
+         t[ReplayExample], int, int]:
+    179 +        state = GameState.initial()
+    180 +        search = MCTS(self.model, self.mcts_config, self.device, self.r
+         ng)
+    181 +        examples: list[tuple[np.ndarray, np.ndarray, int]] = []
+    182 +        root = None
+    183 +
+    184 +        while not state.is_terminal():
+    185 +            temperature = (
+    186 +                self.selfplay_config.temperature
+    187 +                if state.move_count < self.selfplay_config.temperature_
+         moves
+    188 +                else 0.0
+    189 +            )
+    190 +            result = search.run(
+    191 +                state,
+    192 +                add_exploration_noise=add_noise,
+    193 +                temperature=temperature,
+    194 +                root=root,
+    195 +            )
+    196 +            if result.selected_action is None:
+    197 +                break
+    198 +            examples.append(
+    199 +                (
+    200 +                    state.encode(),
+    201 +                    result.visit_policy.astype(np.float32, copy=True),
+    202 +                    int(state.current_player),
+    203 +                )
+    204 +            )
+    205 +            chosen_action = result.selected_action
+    206 +            root = result.root.children.get(chosen_action)
+    207 +            state.apply_move(chosen_action)
+    208 +
+    209 +        winner = int(state.winner)
+    210 +        training_examples: list[ReplayExample] = []
+    211 +        for encoded_state, policy, player in examples:
+    212 +            value = 0.0 if winner == 0 else (1.0 if winner == player el
+         se -1.0)
+    213 +            training_examples.append(
+    214 +                ReplayExample(state=encoded_state.copy(), policy=policy
+         .copy(), value=value)
+    215 +            )
+    216 +            training_examples.append(
+    217 +                ReplayExample(
+    218 +                    state=np.ascontiguousarray(encoded_state[:, :, ::-1
+         ]),
+    219 +                    policy=np.ascontiguousarray(policy[::-1]),
+    220 +                    value=value,
+    221 +                )
+    222 +            )
+    223 +
+    224 +        return training_examples, winner, state.move_count
+    225 +
+    226 +    def train_on_replay(self, *, steps: int | None = None) -> dict[str,
+          float]:
+    227 +        if len(self.replay_buffer) == 0:
+    228 +            raise ValueError("replay buffer is empty")
+    229 +
+    230 +        num_steps = steps or self.training_config.steps_per_iteration
+    231 +        batch_size = min(self.training_config.batch_size, len(self.repl
+         ay_buffer))
+    232 +
+    233 +        total_losses: list[float] = []
+    234 +        policy_losses: list[float] = []
+    235 +        value_losses: list[float] = []
+    236 +
+    237 +        self.model.train()
+    238 +        for _ in range(num_steps):
+    239 +            states, policies, values = self.replay_buffer.sample(batch_
+         size, self.rng)
+    240 +            states_tensor = torch.from_numpy(states).to(self.device)
+    241 +            policy_tensor = torch.from_numpy(policies).to(self.device)
+    242 +            value_tensor = torch.from_numpy(values).to(self.device)
+    243 +
+    244 +            self.optimizer.zero_grad(set_to_none=True)
+    245 +            logits, predicted_values = self.model(states_tensor)
+    246 +            policy_loss = -(policy_tensor * F.log_softmax(logits, dim=1
+         )).sum(dim=1).mean()
+    247 +            value_loss = F.mse_loss(predicted_values, value_tensor)
+    248 +            total_loss = policy_loss + value_loss
+    249 +            total_loss.backward()
+    250 +            torch.nn.utils.clip_grad_norm_(
+    251 +                self.model.parameters(), max_norm=self.training_config.
+         gradient_clip_norm
+    252 +            )
+    253 +            self.optimizer.step()
+    254 +
+    255 +            total_losses.append(float(total_loss.detach().cpu().item())
+         )
+    256 +            policy_losses.append(float(policy_loss.detach().cpu().item(
+         )))
+    257 +            value_losses.append(float(value_loss.detach().cpu().item())
+         )
+    258 +
+    259 +        return {
+    260 +            "total_loss": float(np.mean(total_losses)),
+    261 +            "policy_loss": float(np.mean(policy_losses)),
+    262 +            "value_loss": float(np.mean(value_losses)),
+    263 +        }
+    264 +
+    265 +    def finalize_iteration(self, total_loss: float) -> None:
+    266 +        self.iteration += 1
+    267 +        self.best_loss = min(self.best_loss, total_loss)
+    268 +        self.scheduler.step()
+    269 +
+    270 +    def root_probe(self) -> SearchResult:
+    271 +        probe_state = GameState.initial()
+    272 +        probe_config = MCTSConfig(
+    273 +            simulations=self.selfplay_config.evaluation_simulations,
+    274 +            c_puct=self.mcts_config.c_puct,
+    275 +            dirichlet_alpha=self.mcts_config.dirichlet_alpha,
+    276 +            dirichlet_epsilon=0.0,
+    277 +        )
+    278 +        probe_search = MCTS(self.model, probe_config, self.device, self
+         .rng)
+    279 +        return probe_search.run(
+    280 +            probe_state,
+    281 +            add_exploration_noise=False,
+    282 +            temperature=0.0,
+    283 +        )
+    284 +
+    285 +    def run_iteration(self) -> IterationMetrics:
+    286 +        iteration_number = self.iteration + 1
+    287 +        selfplay_start = time.time()
+    288 +        selfplay_summary = self.populate_replay_from_games(self.selfpla
+         y_config.games_per_iteration)
+    289 +        selfplay_seconds = time.time() - selfplay_start
+    290 +
+    291 +        print(
+    292 +            f"[iter {iteration_number}] self-play: X {selfplay_summary[
+         'x_win_rate']:.3f} | "
+    293 +            f"O {selfplay_summary['o_win_rate']:.3f} | draw {selfplay_s
+         ummary['draw_rate']:.3f} | "
+    294 +            f"avg_len {selfplay_summary['average_game_length']:.2f} | "
+    295 +            f"buffer {len(self.replay_buffer)} | turnover {selfplay_sum
+         mary['replay_turnover_rate']:.3f}"
+    296 +        )
+    297 +        print(f"[iter {iteration_number}] training network...")
+    298 +
+    299 +        train_start = time.time()
+    300 +        if len(self.replay_buffer) < self.training_config.min_buffer_si
+         ze:
+    301 +            train_summary = {
+    302 +                "total_loss": float("nan"),
+    303 +                "policy_loss": float("nan"),
+    304 +                "value_loss": float("nan"),
+    305 +            }
+    306 +            print(
+    307 +                f"[iter {iteration_number}] skipped training because re
+         play buffer "
+    308 +                f"has {len(self.replay_buffer)} examples; need {self.tr
+         aining_config.min_buffer_size}"
+    309 +            )
+    310 +        else:
+    311 +            train_summary = self.train_on_replay()
+    312 +            self.finalize_iteration(train_summary["total_loss"])
+    313 +        train_seconds = time.time() - train_start
+    314 +
+    315 +        probe = self.root_probe()
+    316 +        learning_rate = float(self.optimizer.param_groups[0]["lr"])
+    317 +        most_visited_move = 0 if probe.most_visited_move is None else p
+         robe.most_visited_move + 1
+    318 +
+    319 +        metrics = IterationMetrics(
+    320 +            iteration=self.iteration if not np.isnan(train_summary["tot
+         al_loss"]) else iteration_number,
+    321 +            wall_clock=datetime.now().isoformat(timespec="seconds"),
+    322 +            total_loss=float(train_summary["total_loss"]),
+    323 +            policy_loss=float(train_summary["policy_loss"]),
+    324 +            value_loss=float(train_summary["value_loss"]),
+    325 +            learning_rate=learning_rate,
+    326 +            root_best_move=most_visited_move,
+    327 +            root_visit_count=int(probe.root_visit_count),
+    328 +            root_value_estimate=float(probe.root_value),
+    329 +            x_win_rate=float(selfplay_summary["x_win_rate"]),
+    330 +            o_win_rate=float(selfplay_summary["o_win_rate"]),
+    331 +            draw_rate=float(selfplay_summary["draw_rate"]),
+    332 +            average_game_length=float(selfplay_summary["average_game_le
+         ngth"]),
+    333 +            replay_buffer_size=len(self.replay_buffer),
+    334 +            replay_turnover_rate=float(selfplay_summary["replay_turnove
+         r_rate"]),
+    335 +            generated_examples=int(selfplay_summary["generated_examples
+         "]),
+    336 +            selfplay_seconds=selfplay_seconds,
+    337 +            train_seconds=train_seconds,
+    338 +        )
+    339 +
+    340 +        print(
+    341 +            f"[iter {metrics.iteration}] loss total={metrics.total_loss
+         :.4f} "
+    342 +            f"policy={metrics.policy_loss:.4f} value={metrics.value_los
+         s:.4f} "
+    343 +            f"lr={metrics.learning_rate:.6f} root_move={metrics.root_be
+         st_move} "
+    344 +            f"root_visits={metrics.root_visit_count} root_value={metric
+         s.root_value_estimate:.4f}"
+    345 +        )
+    346 +        self.csv_logger.log(metrics)
+    347 +        return metrics
+    348 +
+    349 +    def checkpoint_paths(self) -> tuple[Path, Path]:
+    350 +        checkpoint_dir = Path(self.training_config.checkpoint_dir)
+    351 +        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    352 +        latest_path = checkpoint_dir / self.training_config.latest_chec
+         kpoint_name
+    353 +        best_path = checkpoint_dir / self.training_config.best_checkpoi
+         nt_name
+    354 +        return latest_path, best_path
+    355 +
+    356 +    def save_checkpoint(self, path: str | Path) -> None:
+    357 +        payload = {
+    358 +            "network_config": asdict(self.network_config),
+    359 +            "mcts_config": asdict(self.mcts_config),
+    360 +            "selfplay_config": asdict(self.selfplay_config),
+    361 +            "training_config": asdict(self.training_config),
+    362 +            "model_state": self.model.state_dict(),
+    363 +            "optimizer_state": self.optimizer.state_dict(),
+    364 +            "scheduler_state": self.scheduler.state_dict(),
+    365 +            "replay_buffer": self.replay_buffer.state_dict(),
+    366 +            "iteration": self.iteration,
+    367 +            "best_loss": self.best_loss,
+    368 +            "rng_state": {
+    369 +                "numpy": self.rng.bit_generator.state,
+    370 +                "python": random.getstate(),
+    371 +                "torch": torch.get_rng_state(),
+    372 +                "torch_cuda": torch.cuda.get_rng_state_all() if torch.c
+         uda.is_available() else None,
+    373 +            },
+    374 +        }
+    375 +        path = Path(path)
+    376 +        path.parent.mkdir(parents=True, exist_ok=True)
+    377 +        torch.save(payload, path)
+    378 +
+    379 +    @classmethod
+    380 +    def load_checkpoint(cls, path: str | Path, *, device: str | None =
+         None) -> "Trainer":
+    381 +        checkpoint = torch.load(path, map_location=device or "cpu", wei
+         ghts_only=False)
+    382 +        training_config = TrainingConfig(**checkpoint["training_config"
+         ])
+    383 +        if device is not None:
+    384 +            training_config.device = device
+    385 +
+    386 +        trainer = cls(
+    387 +            network_config=NetworkConfig(**checkpoint["network_config"]
+         ),
+    388 +            mcts_config=MCTSConfig(**checkpoint["mcts_config"]),
+    389 +            selfplay_config=SelfPlayConfig(**checkpoint["selfplay_confi
+         g"]),
+    390 +            training_config=training_config,
+    391 +        )
+    392 +        trainer.model.load_state_dict(checkpoint["model_state"])
+    393 +        trainer.optimizer.load_state_dict(checkpoint["optimizer_state"]
+         )
+    394 +        trainer.scheduler.load_state_dict(checkpoint["scheduler_state"]
+         )
+    395 +        trainer.replay_buffer = ReplayBuffer.from_state_dict(checkpoint
+         ["replay_buffer"])
+    396 +        trainer.iteration = int(checkpoint["iteration"])
+    397 +        trainer.best_loss = float(checkpoint["best_loss"])
+    398 +
+    399 +        rng_state = checkpoint["rng_state"]
+    400 +        trainer.rng.bit_generator.state = rng_state["numpy"]
+    401 +        random.setstate(rng_state["python"])
+    402 +        torch.set_rng_state(rng_state["torch"])
+    403 +        if torch.cuda.is_available() and rng_state["torch_cuda"] is not
+          None:
+    404 +            torch.cuda.set_rng_state_all(rng_state["torch_cuda"])
+    405 +        return trainer
+    406 +
+    407 +
+    408 +def parse_deadline_file(path: str | Path) -> tuple[datetime, datetime]:
+    409 +    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    410 +    data = {}
+    411 +    for line in lines:
+    412 +        if ":" not in line:
+    413 +            continue
+    414 +        key, value = line.split(":", 1)
+    415 +        tokens = value.strip().split()
+    416 +        # Input format includes a timezone token that may not be portab
+         le via strptime.
+    417 +        portable_value = " ".join(tokens[:3] + [tokens[3], tokens[-1]])
+    418 +        data[key.strip().lower()] = datetime.strptime(portable_value, "
+         %a %b %d %H:%M:%S %Y")
+    419 +    return data["start time"], data["end time"]
+    420 +
+
+  └ tests/test_training.py (+128 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +from pathlib import Path
+      4 +
+      5 +import numpy as np
+      6 +import pytest
+      7 +import torch
+      8 +
+      9 +from connect4_zero.game import COLUMNS, GameState
+     10 +from connect4_zero.mcts import MCTS, MCTSConfig
+     11 +from connect4_zero.network import Connect4Net, NetworkConfig
+     12 +from connect4_zero.replay import ReplayBuffer, ReplayExample
+     13 +from connect4_zero.training import SelfPlayConfig, Trainer, TrainingCon
+         fig
+     14 +
+     15 +
+     16 +class UniformNet(torch.nn.Module):
+     17 +    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Ten
+         sor]:
+     18 +        batch = x.shape[0]
+     19 +        policy = torch.zeros((batch, COLUMNS), dtype=x.dtype, device=x.
+         device)
+     20 +        value = torch.zeros((batch,), dtype=x.dtype, device=x.device)
+     21 +        return policy, value
+     22 +
+     23 +
+     24 +def _make_example(seed: int) -> ReplayExample:
+     25 +    state = GameState.from_history(((seed % 7), ((seed + 1) % 7), ((see
+         d + 2) % 7)))
+     26 +    policy = np.zeros((7,), dtype=np.float32)
+     27 +    policy[seed % 7] = 1.0
+     28 +    value = 1.0 if seed % 2 == 0 else -1.0
+     29 +    return ReplayExample(state=state.encode(), policy=policy, value=val
+         ue)
+     30 +
+     31 +
+     32 +def test_network_output_shapes() -> None:
+     33 +    model = Connect4Net(NetworkConfig(channels=16, residual_blocks=2))
+     34 +    inputs = torch.randn(4, 3, 6, 7)
+     35 +    policy_logits, values = model(inputs)
+     36 +    assert policy_logits.shape == (4, 7)
+     37 +    assert values.shape == (4,)
+     38 +
+     39 +
+     40 +def test_replay_buffer_overwrites_oldest_examples() -> None:
+     41 +    buffer = ReplayBuffer(capacity=3)
+     42 +    overwritten = buffer.extend(_make_example(seed) for seed in range(5
+         ))
+     43 +    assert overwritten == 2
+     44 +    assert len(buffer) == 3
+     45 +    state_dict = buffer.state_dict()
+     46 +    assert state_dict["states"].shape == (3, 3, 6, 7)
+     47 +    assert state_dict["policies"].shape == (3, 7)
+     48 +    assert state_dict["values"].shape == (3,)
+     49 +
+     50 +
+     51 +def test_mcts_finds_immediate_winning_move() -> None:
+     52 +    state = GameState.initial()
+     53 +    for move in (0, 0, 1, 1, 2, 2):
+     54 +        state.apply_move(move)
+     55 +
+     56 +    search = MCTS(
+     57 +        model=UniformNet(),
+     58 +        config=MCTSConfig(simulations=96, c_puct=1.5, dirichlet_epsilon
+         =0.0),
+     59 +        device="cpu",
+     60 +        rng=np.random.default_rng(5),
+     61 +    )
+     62 +    result = search.run(state, add_exploration_noise=False, temperature
+         =0.0)
+     63 +    assert result.selected_action == 3
+     64 +    assert result.most_visited_move == 3
+     65 +    assert result.visit_policy.sum() == pytest.approx(1.0)
+     66 +    assert result.visit_policy[3] == pytest.approx(1.0)
+     67 +
+     68 +
+     69 +def test_checkpoint_resume_preserves_optimizer_scheduler_and_rng(tmp_pa
+         th: Path) -> None:
+     70 +    torch.use_deterministic_algorithms(True)
+     71 +    trainer = Trainer(
+     72 +        network_config=NetworkConfig(channels=16, residual_blocks=1),
+     73 +        mcts_config=MCTSConfig(simulations=8, dirichlet_epsilon=0.0),
+     74 +        selfplay_config=SelfPlayConfig(games_per_iteration=2, simulatio
+         ns_per_move=8, evaluation_simulations=8),
+     75 +        training_config=TrainingConfig(
+     76 +            device="cpu",
+     77 +            seed=123,
+     78 +            batch_size=4,
+     79 +            steps_per_iteration=3,
+     80 +            min_buffer_size=1,
+     81 +            buffer_capacity=128,
+     82 +            learning_rate=1e-2,
+     83 +            lr_step_size=1,
+     84 +            lr_gamma=0.5,
+     85 +            checkpoint_dir=str(tmp_path / "checkpoints"),
+     86 +            log_csv_path=str(tmp_path / "training.csv"),
+     87 +        ),
+     88 +    )
+     89 +
+     90 +    trainer.replay_buffer.extend(_make_example(seed) for seed in range(
+         16))
+     91 +    trainer.train_on_replay(steps=2)
+     92 +    trainer.finalize_iteration(0.5)
+     93 +
+     94 +    checkpoint_path = tmp_path / "resume.pt"
+     95 +    trainer.save_checkpoint(checkpoint_path)
+     96 +
+     97 +    original_metrics = trainer.train_on_replay(steps=2)
+     98 +    trainer.finalize_iteration(original_metrics["total_loss"])
+     99 +    original_lr = trainer.optimizer.param_groups[0]["lr"]
+    100 +    original_iteration = trainer.iteration
+    101 +    original_model_state = {
+    102 +        key: value.detach().clone() for key, value in trainer.model.sta
+         te_dict().items()
+    103 +    }
+    104 +    original_optimizer_state = trainer.optimizer.state_dict()
+    105 +
+    106 +    resumed = Trainer.load_checkpoint(checkpoint_path, device="cpu")
+    107 +    resumed_metrics = resumed.train_on_replay(steps=2)
+    108 +    resumed.finalize_iteration(resumed_metrics["total_loss"])
+    109 +
+    110 +    assert resumed.iteration == original_iteration
+    111 +    assert resumed.optimizer.param_groups[0]["lr"] == pytest.approx(ori
+         ginal_lr)
+    112 +    assert resumed_metrics["total_loss"] == pytest.approx(original_metr
+         ics["total_loss"], abs=1e-7)
+    113 +    assert resumed_metrics["policy_loss"] == pytest.approx(original_met
+         rics["policy_loss"], abs=1e-7)
+    114 +    assert resumed_metrics["value_loss"] == pytest.approx(original_metr
+         ics["value_loss"], abs=1e-7)
+    115 +
+    116 +    for key, value in resumed.model.state_dict().items():
+    117 +        assert torch.allclose(value, original_model_state[key], atol=1e
+         -7, rtol=1e-7)
+    118 +
+    119 +    original_optimizer_state = original_optimizer_state["state"]
+    120 +    resumed_optimizer_state = resumed.optimizer.state_dict()["state"]
+    121 +    assert original_optimizer_state.keys() == resumed_optimizer_state.k
+         eys()
+    122 +    for state_key in original_optimizer_state:
+    123 +        for tensor_name, tensor_value in original_optimizer_state[state
+         _key].items():
+    124 +            resumed_value = resumed_optimizer_state[state_key][tensor_n
+         ame]
+    125 +            if torch.is_tensor(tensor_value):
+    126 +                assert torch.allclose(tensor_value, resumed_value, atol
+         =1e-7, rtol=1e-7)
+    127 +            else:
+    128 +                assert resumed_value == tensor_value
+
+─ Worked for 3m 29s ────────────────────────────────────────────────────────────
+
+• The training tests are still running; I’m waiting for the save/load
+  determinism case to finish before I proceed.
+
+• Ran pytest -q tests/test_game.py tests/test_training.py
+  └ ..................
+    [100%]
+    18 passed in 1.43s
+
+• Waited for background terminal
+
+─ Worked for 1m 24s ────────────────────────────────────────────────────────────
+
+• I’ve got the core stack passing tests. I’m wiring the operational layer now:
+  resumable training loop with deadline handling, SIGINT behavior between
+  phases, and the two interactive modes that consume the trained model.
+
+• Edited connect4_zero/training.py (+22 -4)
+    179          state = GameState.initial()
+    180 -        search = MCTS(self.model, self.mcts_config, self.device, self.r
+         ng)
+    180 +        search_config = MCTSConfig(
+    181 +            simulations=self.selfplay_config.simulations_per_move,
+    182 +            c_puct=self.mcts_config.c_puct,
+    183 +            dirichlet_alpha=self.mcts_config.dirichlet_alpha,
+    184 +            dirichlet_epsilon=self.mcts_config.dirichlet_epsilon,
+    185 +        )
+    186 +        search = MCTS(self.model, search_config, self.device, self.rng)
+    187          examples: list[tuple[np.ndarray, np.ndarray, int]] = []
+        ⋮
+    270
+    265 -    def finalize_iteration(self, total_loss: float) -> None:
+    271 +    def finalize_iteration(self, total_loss: float | None) -> None:
+    272          self.iteration += 1
+    267 -        self.best_loss = min(self.best_loss, total_loss)
+    268 -        self.scheduler.step()
+    273 +        if total_loss is not None and np.isfinite(total_loss):
+    274 +            self.best_loss = min(self.best_loss, total_loss)
+    275 +            self.scheduler.step()
+    276
+        ⋮
+    316              )
+    317 +            self.finalize_iteration(None)
+    318          else:
+        ⋮
+    428
+    429 +
+    430 +def format_top_child_stats(result: SearchResult, *, limit: int = 3) ->
+         list[str]:
+    431 +    lines: list[str] = []
+    432 +    for child in result.child_stats[:limit]:
+    433 +        win_probability = (-child.value + 1.0) / 2.0
+    434 +        lines.append(
+    435 +            f"col {child.move + 1}: visits={child.visits} prior={child.
+         prior:.3f} "
+    436 +            f"win_prob={win_probability:.3f}"
+    437 +        )
+    438 +    return lines
+
+• Deleted connect4_zero/cli.py (+0 -64)
+     1 -from __future__ import annotations
+     2 -
+     3 -import argparse
+     4 -
+     5 -from .game import GameState, InvalidMoveError
+     6 -
+     7 -
+     8 -def _player_name(player: int) -> str:
+     9 -    return "Player 1 (X)" if player == 1 else "Player 2 (O)"
+    10 -
+    11 -
+    12 -def prompt_human_move(state: GameState) -> int:
+    13 -    while True:
+    14 -        raw_value = input(f"{_player_name(int(state.current_player))}, c
+        hoose column 1-7: ").strip()
+    15 -        if raw_value.lower() in {"q", "quit", "exit"}:
+    16 -            raise SystemExit(0)
+    17 -        if not raw_value.isdigit():
+    18 -            print("Please enter a column number from 1 to 7.")
+    19 -            continue
+    20 -        column = int(raw_value) - 1
+    21 -        try:
+    22 -            if not state.is_legal(column):
+    23 -                raise InvalidMoveError(f"column {column + 1} is not avai
+        lable")
+    24 -            return column
+    25 -        except InvalidMoveError as error:
+    26 -            print(error)
+    27 -
+    28 -
+    29 -def run_human_vs_human() -> int:
+    30 -    state = GameState.initial()
+    31 -    while not state.is_terminal():
+    32 -        print()
+    33 -        print(state.render())
+    34 -        move = prompt_human_move(state)
+    35 -        state.apply_move(move)
+    36 -
+    37 -    print()
+    38 -    print(state.render())
+    39 -    if state.winner == 1:
+    40 -        print("Player 1 (X) wins.")
+    41 -    elif state.winner == -1:
+    42 -        print("Player 2 (O) wins.")
+    43 -    else:
+    44 -        print("Draw.")
+    45 -    return 0
+    46 -
+    47 -
+    48 -def build_parser() -> argparse.ArgumentParser:
+    49 -    parser = argparse.ArgumentParser(description="Connect 4 project CLI"
+        )
+    50 -    subparsers = parser.add_subparsers(dest="command", required=True)
+    51 -    subparsers.add_parser("human", help="Play human vs human in the term
+        inal")
+    52 -    return parser
+    53 -
+    54 -
+    55 -def main() -> int:
+    56 -    args = build_parser().parse_args()
+    57 -    if args.command == "human":
+    58 -        return run_human_vs_human()
+    59 -    raise ValueError(f"unknown command {args.command!r}")
+    60 -
+    61 -
+    62 -if __name__ == "__main__":
+    63 -    raise SystemExit(main())
+    64 -
+
+• Added connect4_zero/cli.py (+440 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import argparse
+      4 +import math
+      5 +import time
+      6 +from datetime import datetime, timedelta
+      7 +from pathlib import Path
+      8 +
+      9 +import numpy as np
+     10 +import torch
+     11 +
+     12 +from .game import GameState, InvalidMoveError, parse_history_string
+     13 +from .mcts import MCTS, MCTSConfig
+     14 +from .network import NetworkConfig
+     15 +from .training import (
+     16 +    CSVLogger,
+     17 +    IterationMetrics,
+     18 +    SelfPlayConfig,
+     19 +    ShutdownHandler,
+     20 +    Trainer,
+     21 +    TrainingConfig,
+     22 +    format_top_child_stats,
+     23 +    parse_deadline_file,
+     24 +)
+     25 +
+     26 +
+     27 +def _player_name(player: int) -> str:
+     28 +    return "Player 1 (X)" if player == 1 else "Player 2 (O)"
+     29 +
+     30 +
+     31 +def _default_device() -> str:
+     32 +    return "cuda" if torch.cuda.is_available() else "cpu"
+     33 +
+     34 +
+     35 +def _resolve_checkpoint_path(explicit: str | None, checkpoint_dir: str
+         = "checkpoints") -> Path:
+     36 +    if explicit:
+     37 +        return Path(explicit)
+     38 +    best_path = Path(checkpoint_dir) / "best.pt"
+     39 +    latest_path = Path(checkpoint_dir) / "latest.pt"
+     40 +    if best_path.exists():
+     41 +        return best_path
+     42 +    return latest_path
+     43 +
+     44 +
+     45 +def prompt_human_move(state: GameState) -> int:
+     46 +    while True:
+     47 +        raw_value = input(f"{_player_name(int(state.current_player))},
+         choose column 1-7: ").strip()
+     48 +        if raw_value.lower() in {"q", "quit", "exit"}:
+     49 +            raise SystemExit(0)
+     50 +        if not raw_value.isdigit():
+     51 +            print("Please enter a column number from 1 to 7.")
+     52 +            continue
+     53 +        column = int(raw_value) - 1
+     54 +        try:
+     55 +            if not state.is_legal(column):
+     56 +                raise InvalidMoveError(f"column {column + 1} is not ava
+         ilable")
+     57 +            return column
+     58 +        except InvalidMoveError as error:
+     59 +            print(error)
+     60 +
+     61 +
+     62 +def run_human_vs_human() -> int:
+     63 +    state = GameState.initial()
+     64 +    while not state.is_terminal():
+     65 +        print()
+     66 +        print(state.render())
+     67 +        move = prompt_human_move(state)
+     68 +        state.apply_move(move)
+     69 +
+     70 +    print()
+     71 +    print(state.render())
+     72 +    if state.winner == 1:
+     73 +        print("Player 1 (X) wins.")
+     74 +    elif state.winner == -1:
+     75 +        print("Player 2 (O) wins.")
+     76 +    else:
+     77 +        print("Draw.")
+     78 +    return 0
+     79 +
+     80 +
+     81 +def _build_trainer_from_args(args: argparse.Namespace) -> Trainer:
+     82 +    return Trainer(
+     83 +        network_config=NetworkConfig(
+     84 +            channels=args.channels,
+     85 +            residual_blocks=args.residual_blocks,
+     86 +        ),
+     87 +        mcts_config=MCTSConfig(
+     88 +            simulations=args.simulations_per_move,
+     89 +            c_puct=args.c_puct,
+     90 +            dirichlet_alpha=args.dirichlet_alpha,
+     91 +            dirichlet_epsilon=args.dirichlet_epsilon,
+     92 +        ),
+     93 +        selfplay_config=SelfPlayConfig(
+     94 +            games_per_iteration=args.games_per_iteration,
+     95 +            simulations_per_move=args.simulations_per_move,
+     96 +            temperature=args.temperature,
+     97 +            temperature_moves=args.temperature_moves,
+     98 +            evaluation_simulations=args.evaluation_simulations,
+     99 +        ),
+    100 +        training_config=TrainingConfig(
+    101 +            device=args.device,
+    102 +            seed=args.seed,
+    103 +            batch_size=args.batch_size,
+    104 +            steps_per_iteration=args.steps_per_iteration,
+    105 +            min_buffer_size=args.min_buffer_size,
+    106 +            buffer_capacity=args.buffer_capacity,
+    107 +            learning_rate=args.learning_rate,
+    108 +            weight_decay=args.weight_decay,
+    109 +            gradient_clip_norm=args.gradient_clip_norm,
+    110 +            lr_step_size=args.lr_step_size,
+    111 +            lr_gamma=args.lr_gamma,
+    112 +            checkpoint_every=args.checkpoint_every,
+    113 +            checkpoint_dir=args.checkpoint_dir,
+    114 +            log_csv_path=args.log_csv_path,
+    115 +        ),
+    116 +    )
+    117 +
+    118 +
+    119 +def _load_or_create_trainer(args: argparse.Namespace) -> Trainer:
+    120 +    explicit_resume = Path(args.resume) if args.resume else None
+    121 +    latest_candidate = Path(args.checkpoint_dir) / "latest.pt"
+    122 +    if explicit_resume and explicit_resume.exists():
+    123 +        print(f"Resuming from {explicit_resume}")
+    124 +        return Trainer.load_checkpoint(explicit_resume, device=args.dev
+         ice)
+    125 +    if args.auto_resume and latest_candidate.exists():
+    126 +        print(f"Auto-resuming from {latest_candidate}")
+    127 +        return Trainer.load_checkpoint(latest_candidate, device=args.de
+         vice)
+    128 +    print("Starting a new training run.")
+    129 +    return _build_trainer_from_args(args)
+    130 +
+    131 +
+    132 +def _build_iteration_metrics(
+    133 +    trainer: Trainer,
+    134 +    iteration_number: int,
+    135 +    selfplay_summary: dict[str, float],
+    136 +    train_summary: dict[str, float],
+    137 +    selfplay_seconds: float,
+    138 +    train_seconds: float,
+    139 +) -> IterationMetrics:
+    140 +    probe = trainer.root_probe()
+    141 +    root_best_move = 0 if probe.most_visited_move is None else probe.mo
+         st_visited_move + 1
+    142 +    return IterationMetrics(
+    143 +        iteration=iteration_number,
+    144 +        wall_clock=datetime.now().isoformat(timespec="seconds"),
+    145 +        total_loss=float(train_summary["total_loss"]),
+    146 +        policy_loss=float(train_summary["policy_loss"]),
+    147 +        value_loss=float(train_summary["value_loss"]),
+    148 +        learning_rate=float(trainer.optimizer.param_groups[0]["lr"]),
+    149 +        root_best_move=root_best_move,
+    150 +        root_visit_count=int(probe.root_visit_count),
+    151 +        root_value_estimate=float(probe.root_value),
+    152 +        x_win_rate=float(selfplay_summary["x_win_rate"]),
+    153 +        o_win_rate=float(selfplay_summary["o_win_rate"]),
+    154 +        draw_rate=float(selfplay_summary["draw_rate"]),
+    155 +        average_game_length=float(selfplay_summary["average_game_length
+         "]),
+    156 +        replay_buffer_size=len(trainer.replay_buffer),
+    157 +        replay_turnover_rate=float(selfplay_summary["replay_turnover_ra
+         te"]),
+    158 +        generated_examples=int(selfplay_summary["generated_examples"]),
+    159 +        selfplay_seconds=selfplay_seconds,
+    160 +        train_seconds=train_seconds,
+    161 +    )
+    162 +
+    163 +
+    164 +def _print_iteration_metrics(metrics: IterationMetrics) -> None:
+    165 +    print(
+    166 +        f"[iter {metrics.iteration}] loss total={metrics.total_loss:.4f
+         } "
+    167 +        f"policy={metrics.policy_loss:.4f} value={metrics.value_loss:.4
+         f} "
+    168 +        f"lr={metrics.learning_rate:.6f} root_move={metrics.root_best_m
+         ove} "
+    169 +        f"root_visits={metrics.root_visit_count} root_value={metrics.ro
+         ot_value_estimate:.4f}"
+    170 +    )
+    171 +
+    172 +
+    173 +def run_training(args: argparse.Namespace) -> int:
+    174 +    trainer = _load_or_create_trainer(args)
+    175 +    latest_path, best_path = trainer.checkpoint_paths()
+    176 +    csv_logger = CSVLogger(trainer.training_config.log_csv_path)
+    177 +
+    178 +    deadline_end: datetime | None = None
+    179 +    if not args.ignore_deadline and Path(args.deadline_file).exists():
+    180 +        _, deadline_end = parse_deadline_file(args.deadline_file)
+    181 +        print(
+    182 +            f"Deadline active until {deadline_end.isoformat(sep=' ')} "
+    183 +            f"with a {args.deadline_buffer_seconds}s buffer."
+    184 +        )
+    185 +
+    186 +    shutdown = ShutdownHandler()
+    187 +    shutdown.install()
+    188 +
+    189 +    try:
+    190 +        while True:
+    191 +            if args.iterations is not None and trainer.iteration >= arg
+         s.iterations:
+    192 +                print("Requested iteration target reached.")
+    193 +                break
+    194 +            if deadline_end is not None:
+    195 +                stop_time = deadline_end - timedelta(seconds=args.deadl
+         ine_buffer_seconds)
+    196 +                if datetime.now() >= stop_time:
+    197 +                    print("Deadline buffer reached; checkpointing and s
+         topping.")
+    198 +                    break
+    199 +
+    200 +            iteration_number = trainer.iteration + 1
+    201 +            previous_best = trainer.best_loss
+    202 +
+    203 +            selfplay_start = time.time()
+    204 +            selfplay_summary = trainer.populate_replay_from_games(
+    205 +                trainer.selfplay_config.games_per_iteration
+    206 +            )
+    207 +            selfplay_seconds = time.time() - selfplay_start
+    208 +
+    209 +            print(
+    210 +                f"[iter {iteration_number}] self-play: X {selfplay_summ
+         ary['x_win_rate']:.3f} | "
+    211 +                f"O {selfplay_summary['o_win_rate']:.3f} | draw {selfpl
+         ay_summary['draw_rate']:.3f} | "
+    212 +                f"avg_len {selfplay_summary['average_game_length']:.2f}
+          | "
+    213 +                f"buffer {len(trainer.replay_buffer)} | "
+    214 +                f"turnover {selfplay_summary['replay_turnover_rate']:.3
+         f}"
+    215 +            )
+    216 +
+    217 +            if shutdown.stop_requested:
+    218 +                print(
+    219 +                    f"[iter {iteration_number}] shutdown requested afte
+         r self-play; "
+    220 +                    "saving checkpoint before the training phase."
+    221 +                )
+    222 +                trainer.save_checkpoint(latest_path)
+    223 +                break
+    224 +
+    225 +            print(f"[iter {iteration_number}] training network...")
+    226 +            train_start = time.time()
+    227 +            if len(trainer.replay_buffer) < trainer.training_config.min
+         _buffer_size:
+    228 +                train_summary = {
+    229 +                    "total_loss": float("nan"),
+    230 +                    "policy_loss": float("nan"),
+    231 +                    "value_loss": float("nan"),
+    232 +                }
+    233 +                print(
+    234 +                    f"[iter {iteration_number}] skipped training becaus
+         e replay buffer has "
+    235 +                    f"{len(trainer.replay_buffer)} examples; need "
+    236 +                    f"{trainer.training_config.min_buffer_size}"
+    237 +                )
+    238 +                trainer.finalize_iteration(None)
+    239 +            else:
+    240 +                train_summary = trainer.train_on_replay()
+    241 +                trainer.finalize_iteration(train_summary["total_loss"])
+    242 +            train_seconds = time.time() - train_start
+    243 +
+    244 +            metrics = _build_iteration_metrics(
+    245 +                trainer=trainer,
+    246 +                iteration_number=trainer.iteration,
+    247 +                selfplay_summary=selfplay_summary,
+    248 +                train_summary=train_summary,
+    249 +                selfplay_seconds=selfplay_seconds,
+    250 +                train_seconds=train_seconds,
+    251 +            )
+    252 +            _print_iteration_metrics(metrics)
+    253 +            csv_logger.log(metrics)
+    254 +
+    255 +            trainer.save_checkpoint(latest_path)
+    256 +            if math.isfinite(metrics.total_loss) and metrics.total_loss
+          <= previous_best:
+    257 +                trainer.save_checkpoint(best_path)
+    258 +
+    259 +            if shutdown.stop_requested:
+    260 +                print("Shutdown requested; checkpoint saved after the t
+         raining phase.")
+    261 +                break
+    262 +    finally:
+    263 +        trainer.save_checkpoint(latest_path)
+    264 +        shutdown.restore()
+    265 +
+    266 +    return 0
+    267 +
+    268 +
+    269 +def _load_trainer_for_inference(args: argparse.Namespace) -> Trainer:
+    270 +    checkpoint_path = _resolve_checkpoint_path(args.checkpoint, args.ch
+         eckpoint_dir)
+    271 +    if not checkpoint_path.exists():
+    272 +        raise FileNotFoundError(
+    273 +            f"checkpoint not found at {checkpoint_path}. Train a model
+         first or pass --checkpoint."
+    274 +        )
+    275 +    return Trainer.load_checkpoint(checkpoint_path, device=args.device)
+    276 +
+    277 +
+    278 +def run_human_vs_model(args: argparse.Namespace) -> int:
+    279 +    trainer = _load_trainer_for_inference(args)
+    280 +    human_player = 1 if args.human_first else -1
+    281 +    search = MCTS(
+    282 +        trainer.model,
+    283 +        MCTSConfig(
+    284 +            simulations=args.simulations,
+    285 +            c_puct=args.c_puct,
+    286 +            dirichlet_alpha=trainer.mcts_config.dirichlet_alpha,
+    287 +            dirichlet_epsilon=0.0,
+    288 +        ),
+    289 +        trainer.device,
+    290 +        np.random.default_rng(args.seed),
+    291 +    )
+    292 +
+    293 +    state = GameState.initial()
+    294 +    while not state.is_terminal():
+    295 +        print()
+    296 +        print(state.render())
+    297 +        if int(state.current_player) == human_player:
+    298 +            move = prompt_human_move(state)
+    299 +            state.apply_move(move)
+    300 +            continue
+    301 +
+    302 +        result = search.run(state, add_exploration_noise=False, tempera
+         ture=0.0)
+    303 +        print("Model search:")
+    304 +        for line in format_top_child_stats(result, limit=3):
+    305 +            print(f"  {line}")
+    306 +        if result.selected_action is None:
+    307 +            break
+    308 +        print(
+    309 +            f"Model chooses column {result.selected_action + 1} "
+    310 +            f"(root win_prob={(result.root_value + 1.0) / 2.0:.3f})."
+    311 +        )
+    312 +        state.apply_move(result.selected_action)
+    313 +
+    314 +    print()
+    315 +    print(state.render())
+    316 +    if state.winner == 0:
+    317 +        print("Draw.")
+    318 +    elif state.winner == human_player:
+    319 +        print("Human wins.")
+    320 +    else:
+    321 +        print("Model wins.")
+    322 +    return 0
+    323 +
+    324 +
+    325 +def run_competition_move(args: argparse.Namespace) -> int:
+    326 +    trainer = _load_trainer_for_inference(args)
+    327 +    game_state_path = Path(args.game_state)
+    328 +    output_path = Path(args.output)
+    329 +    history_string = ""
+    330 +    if game_state_path.exists():
+    331 +        history_string = game_state_path.read_text(encoding="utf-8").st
+         rip()
+    332 +
+    333 +    try:
+    334 +        state = GameState.from_history(parse_history_string(history_str
+         ing))
+    335 +    except Exception:
+    336 +        state = GameState.initial()
+    337 +
+    338 +    if state.is_terminal():
+    339 +        output = "DRAW" if state.winner == 0 else "LOSS"
+    340 +        output_path.write_text(output, encoding="utf-8")
+    341 +        return 0
+    342 +
+    343 +    search = MCTS(
+    344 +        trainer.model,
+    345 +        MCTSConfig(
+    346 +            simulations=args.simulations,
+    347 +            c_puct=args.c_puct,
+    348 +            dirichlet_alpha=trainer.mcts_config.dirichlet_alpha,
+    349 +            dirichlet_epsilon=0.0,
+    350 +        ),
+    351 +        trainer.device,
+    352 +        np.random.default_rng(args.seed),
+    353 +    )
+    354 +    result = search.run(state, add_exploration_noise=False, temperature
+         =0.0)
+    355 +    if result.selected_action is None:
+    356 +        legal_moves = state.legal_moves()
+    357 +        output = str(legal_moves[0] + 1) if legal_moves else "DRAW"
+    358 +    else:
+    359 +        output = str(result.selected_action + 1)
+    360 +    output_path.write_text(output, encoding="utf-8")
+    361 +    return 0
+    362 +
+    363 +
+    364 +def build_parser() -> argparse.ArgumentParser:
+    365 +    parser = argparse.ArgumentParser(description="Connect 4 AlphaZero-s
+         tyle project CLI")
+    366 +    subparsers = parser.add_subparsers(dest="command", required=True)
+    367 +
+    368 +    subparsers.add_parser("human", help="Play human vs human in the ter
+         minal")
+    369 +
+    370 +    train_parser = subparsers.add_parser("train", help="Run AlphaZero-s
+         tyle self-play training")
+    371 +    train_parser.add_argument("--iterations", type=int, default=None)
+    372 +    train_parser.add_argument("--resume", type=str, default=None)
+    373 +    train_parser.add_argument("--auto-resume", action="store_true", def
+         ault=True)
+    374 +    train_parser.add_argument("--no-auto-resume", action="store_false",
+          dest="auto_resume")
+    375 +    train_parser.add_argument("--device", type=str, default=_default_de
+         vice())
+    376 +    train_parser.add_argument("--seed", type=int, default=7)
+    377 +    train_parser.add_argument("--channels", type=int, default=64)
+    378 +    train_parser.add_argument("--residual-blocks", type=int, default=6)
+    379 +    train_parser.add_argument("--games-per-iteration", type=int, defaul
+         t=32)
+    380 +    train_parser.add_argument("--simulations-per-move", type=int, defau
+         lt=96)
+    381 +    train_parser.add_argument("--evaluation-simulations", type=int, def
+         ault=256)
+    382 +    train_parser.add_argument("--temperature", type=float, default=1.0)
+    383 +    train_parser.add_argument("--temperature-moves", type=int, default=
+         8)
+    384 +    train_parser.add_argument("--c-puct", type=float, default=1.7)
+    385 +    train_parser.add_argument("--dirichlet-alpha", type=float, default=
+         0.35)
+    386 +    train_parser.add_argument("--dirichlet-epsilon", type=float, defaul
+         t=0.25)
+    387 +    train_parser.add_argument("--batch-size", type=int, default=256)
+    388 +    train_parser.add_argument("--steps-per-iteration", type=int, defaul
+         t=128)
+    389 +    train_parser.add_argument("--min-buffer-size", type=int, default=51
+         2)
+    390 +    train_parser.add_argument("--buffer-capacity", type=int, default=20
+         0000)
+    391 +    train_parser.add_argument("--learning-rate", type=float, default=1e
+         -3)
+    392 +    train_parser.add_argument("--weight-decay", type=float, default=1e-
+         4)
+    393 +    train_parser.add_argument("--gradient-clip-norm", type=float, defau
+         lt=1.0)
+    394 +    train_parser.add_argument("--lr-step-size", type=int, default=10)
+    395 +    train_parser.add_argument("--lr-gamma", type=float, default=0.7)
+    396 +    train_parser.add_argument("--checkpoint-every", type=int, default=1
+         )
+    397 +    train_parser.add_argument("--checkpoint-dir", type=str, default="ch
+         eckpoints")
+    398 +    train_parser.add_argument("--log-csv-path", type=str, default="arti
+         facts/training_log.csv")
+    399 +    train_parser.add_argument("--deadline-file", type=str, default=".de
+         adline")
+    400 +    train_parser.add_argument("--deadline-buffer-seconds", type=int, de
+         fault=300)
+    401 +    train_parser.add_argument("--ignore-deadline", action="store_true")
+    402 +
+    403 +    model_parser = subparsers.add_parser("human-vs-model", help="Play a
+         gainst the current best model")
+    404 +    model_parser.add_argument("--checkpoint", type=str, default=None)
+    405 +    model_parser.add_argument("--checkpoint-dir", type=str, default="ch
+         eckpoints")
+    406 +    model_parser.add_argument("--device", type=str, default=_default_de
+         vice())
+    407 +    model_parser.add_argument("--simulations", type=int, default=400)
+    408 +    model_parser.add_argument("--c-puct", type=float, default=1.7)
+    409 +    model_parser.add_argument("--seed", type=int, default=17)
+    410 +    side_group = model_parser.add_mutually_exclusive_group()
+    411 +    side_group.add_argument("--human-first", action="store_true", defau
+         lt=True)
+    412 +    side_group.add_argument("--human-second", action="store_false", des
+         t="human_first")
+    413 +
+    414 +    compete_parser = subparsers.add_parser("compete", help="Choose a co
+         mpetition move from game_state.txt")
+    415 +    compete_parser.add_argument("--checkpoint", type=str, default=None)
+    416 +    compete_parser.add_argument("--checkpoint-dir", type=str, default="
+         checkpoints")
+    417 +    compete_parser.add_argument("--device", type=str, default=_default_
+         device())
+    418 +    compete_parser.add_argument("--simulations", type=int, default=480)
+    419 +    compete_parser.add_argument("--c-puct", type=float, default=1.7)
+    420 +    compete_parser.add_argument("--seed", type=int, default=23)
+    421 +    compete_parser.add_argument("--game-state", type=str, default="game
+         _state.txt")
+    422 +    compete_parser.add_argument("--output", type=str, default="next_mov
+         e.txt")
+    423 +    return parser
+    424 +
+    425 +
+    426 +def main() -> int:
+    427 +    args = build_parser().parse_args()
+    428 +    if args.command == "human":
+    429 +        return run_human_vs_human()
+    430 +    if args.command == "train":
+    431 +        return run_training(args)
+    432 +    if args.command == "human-vs-model":
+    433 +        return run_human_vs_model(args)
+    434 +    if args.command == "compete":
+    435 +        return run_competition_move(args)
+    436 +    raise ValueError(f"unknown command {args.command!r}")
+    437 +
+    438 +
+    439 +if __name__ == "__main__":
+    440 +    raise SystemExit(main())
+
+• Ran pytest -q tests/test_game.py tests/test_training.py
+  └ ..................
+    [100%]
+    18 passed in 1.14s
+
+• Waited for background terminal
+
+─ Worked for 1m 38s ────────────────────────────────────────────────────────────
+
+• I’m adding the competition-path tests now. The key gap is validating that the
+  CLI can load a checkpoint, parse game_state.txt, and always emit a legal
+  next_move.txt or the required terminal token.
+
+• Added tests/test_cli.py (+114 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import subprocess
+      4 +from pathlib import Path
+      5 +
+      6 +from connect4_zero.game import GameState
+      7 +from connect4_zero.mcts import MCTSConfig
+      8 +from connect4_zero.network import NetworkConfig
+      9 +from connect4_zero.training import SelfPlayConfig, Trainer, TrainingCon
+         fig, parse_deadline_file
+     10 +
+     11 +
+     12 +def _save_checkpoint(directory: Path) -> Path:
+     13 +    trainer = Trainer(
+     14 +        network_config=NetworkConfig(channels=16, residual_blocks=1),
+     15 +        mcts_config=MCTSConfig(simulations=8, dirichlet_epsilon=0.0),
+     16 +        selfplay_config=SelfPlayConfig(games_per_iteration=1, simulatio
+         ns_per_move=8, evaluation_simulations=8),
+     17 +        training_config=TrainingConfig(
+     18 +            device="cpu",
+     19 +            seed=42,
+     20 +            batch_size=4,
+     21 +            steps_per_iteration=1,
+     22 +            min_buffer_size=1,
+     23 +            buffer_capacity=32,
+     24 +            checkpoint_dir=str(directory),
+     25 +            log_csv_path=str(directory / "training.csv"),
+     26 +        ),
+     27 +    )
+     28 +    checkpoint_path = directory / "best.pt"
+     29 +    trainer.save_checkpoint(checkpoint_path)
+     30 +    return checkpoint_path
+     31 +
+     32 +
+     33 +def test_parse_deadline_file_matches_workspace_format(tmp_path: Path) -
+         > None:
+     34 +    deadline_file = tmp_path / ".deadline"
+     35 +    deadline_file.write_text(
+     36 +        "Start time: Fri Apr  3 15:55:07 CDT 2026\nEnd time: Fri Apr  3
+          18:55:07 CDT 2026\n",
+     37 +        encoding="utf-8",
+     38 +    )
+     39 +    start, end = parse_deadline_file(deadline_file)
+     40 +    assert start.year == 2026
+     41 +    assert start.month == 4
+     42 +    assert start.day == 3
+     43 +    assert end.hour == 18
+     44 +    assert end.minute == 55
+     45 +
+     46 +
+     47 +def test_compete_cli_writes_a_legal_move(tmp_path: Path) -> None:
+     48 +    checkpoint_dir = tmp_path / "checkpoints"
+     49 +    checkpoint_dir.mkdir()
+     50 +    _save_checkpoint(checkpoint_dir)
+     51 +
+     52 +    game_state_path = tmp_path / "game_state.txt"
+     53 +    output_path = tmp_path / "next_move.txt"
+     54 +    game_state_path.write_text("112233", encoding="utf-8")
+     55 +
+     56 +    subprocess.run(
+     57 +        [
+     58 +            "python3",
+     59 +            "-m",
+     60 +            "connect4_zero.cli",
+     61 +            "compete",
+     62 +            "--checkpoint",
+     63 +            str(checkpoint_dir / "best.pt"),
+     64 +            "--device",
+     65 +            "cpu",
+     66 +            "--simulations",
+     67 +            "32",
+     68 +            "--game-state",
+     69 +            str(game_state_path),
+     70 +            "--output",
+     71 +            str(output_path),
+     72 +        ],
+     73 +        check=True,
+     74 +        cwd=tmp_path,
+     75 +    )
+     76 +
+     77 +    move = output_path.read_text(encoding="utf-8")
+     78 +    assert move in {"1", "2", "3", "4", "5", "6", "7"}
+     79 +    state = GameState.from_history("112233")
+     80 +    assert state.is_legal(int(move) - 1)
+     81 +
+     82 +
+     83 +def test_compete_cli_writes_loss_for_terminal_position(tmp_path: Path)
+         -> None:
+     84 +    checkpoint_dir = tmp_path / "checkpoints"
+     85 +    checkpoint_dir.mkdir()
+     86 +    _save_checkpoint(checkpoint_dir)
+     87 +
+     88 +    game_state_path = tmp_path / "game_state.txt"
+     89 +    output_path = tmp_path / "next_move.txt"
+     90 +    # Player 1 has already won with columns 1-4 on the bottom row.
+     91 +    game_state_path.write_text("1122334", encoding="utf-8")
+     92 +
+     93 +    subprocess.run(
+     94 +        [
+     95 +            "python3",
+     96 +            "-m",
+     97 +            "connect4_zero.cli",
+     98 +            "compete",
+     99 +            "--checkpoint",
+    100 +            str(checkpoint_dir / "best.pt"),
+    101 +            "--device",
+    102 +            "cpu",
+    103 +            "--simulations",
+    104 +            "32",
+    105 +            "--game-state",
+    106 +            str(game_state_path),
+    107 +            "--output",
+    108 +            str(output_path),
+    109 +        ],
+    110 +        check=True,
+    111 +        cwd=tmp_path,
+    112 +    )
+    113 +
+    114 +    assert output_path.read_text(encoding="utf-8") == "LOSS"
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The full test suite is running now, including the subprocess-based CLI checks.
+  I’m waiting on that before I write the shell entrypoints and start an actual
+  training run.
+
+• Ran pytest -q
+  └ .FF..................
+    [100%]
+    … +240 lines
+    FAILED tests/test_cli.py::test_compete_cli_writes_loss_for_terminal_position
+    2 failed, 19 passed in 1.21s
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The CLI subprocess tests failed for the right reason: they run outside the
+  repo root, so Python can’t resolve the package module. I’m fixing the tests to
+  inject the workspace on PYTHONPATH, which is also a closer match to how the
+  shell entrypoints will invoke it.
+
+• Edited tests/test_cli.py (+3 -0)
+      2
+      3 +import os
+      4  import subprocess
+        ⋮
+     75          cwd=tmp_path,
+     76 +        env={**os.environ, "PYTHONPATH": str(Path(__file__).resolve().p
+         arents[1])},
+     77      )
+        ⋮
+    113          cwd=tmp_path,
+    114 +        env={**os.environ, "PYTHONPATH": str(Path(__file__).resolve().p
+         arents[1])},
+    115      )
+
+• Waited for background terminal · pytest -q
+
+• Ran pytest -q
+  └ .....................
+    [100%]
+    21 passed in 3.73s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m adding the evaluation entrypoints now. player.sh will be the thin contract
+  adapter, and setup.sh will only do fallback bootstrap training if the trained
+  checkpoint is absent.
+
+• Edited 3 files (+37 -0)
+  └ connect4_zero/__main__.py (+6 -0)
+    1 +from .cli import main
+    2 +
+    3 +
+    4 +if __name__ == "__main__":
+    5 +    raise SystemExit(main())
+    6 +
+
+  └ player.sh (+11 -0)
+     1 +#!/usr/bin/env bash
+     2 +set -euo pipefail
+     3 +
+     4 +export PYTHONPATH="${PWD}${PYTHONPATH:+:${PYTHONPATH}}"
+     5 +
+     6 +python3 -m connect4_zero.cli compete \
+     7 +  --checkpoint-dir checkpoints \
+     8 +  --simulations 480 \
+     9 +  --game-state game_state.txt \
+    10 +  --output next_move.txt
+    11 +
+
+  └ setup.sh (+20 -0)
+     1 +#!/usr/bin/env bash
+     2 +set -euo pipefail
+     3 +
+     4 +export PYTHONPATH="${PWD}${PYTHONPATH:+:${PYTHONPATH}}"
+     5 +
+     6 +mkdir -p artifacts checkpoints
+     7 +
+     8 +if [[ ! -f checkpoints/best.pt && ! -f checkpoints/latest.pt ]]; then
+     9 +  python3 -m connect4_zero.cli train \
+    10 +    --ignore-deadline \
+    11 +    --iterations 6 \
+    12 +    --channels 32 \
+    13 +    --residual-blocks 4 \
+    14 +    --games-per-iteration 12 \
+    15 +    --simulations-per-move 48 \
+    16 +    --evaluation-simulations 96 \
+    17 +    --batch-size 128 \
+    18 +    --steps-per-iteration 48 \
+    19 +    --min-buffer-size 96
+    20 +fi
+
+• Ran chmod +x /workspace/player.sh /workspace/setup.sh
+  └ (no output)
+
+• Ran python3 -m connect4_zero.cli train --help
+  └ usage: cli.py train [-h] [--iterations ITERATIONS] [--resume RESUME]
+                        [--auto-resume] [--no-auto-resume] [--device DEVICE]
+    … +55 lines
+      --deadline-buffer-seconds DEADLINE_BUFFER_SECONDS
+      --ignore-deadline
+
+• Ran python3 -m connect4_zero.cli compete --help
+  └ usage: cli.py compete [-h] [--checkpoint CHECKPOINT]
+                          [--checkpoint-dir CHECKPOINT_DIR] [--device DEVICE]
+    … +12 lines
+      --game-state GAME_STATE
+      --output OUTPUT
+
+• Ran python3 -m connect4_zero.cli --help
+  └ usage: cli.py [-h] {human,train,human-vs-model,compete} ...
+
+    … +9 lines
+    options:
+      -h, --help            show this help message and exit
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The interfaces are wired and executable. I’m checking the clock
+  against .deadline now, then I’m starting an actual training run to produce the
+  saved competition checkpoint rather than leaving the repo with just code and
+  fallback bootstrap.
+
+• Ran date '+Local %Y-%m-%d %H:%M:%S %Z'
+  └ Local 2026-04-03 16:05:55 CDT
+
+• Ran python3 - <<'PY'
+  │ from connect4_zero.training import parse_deadline_file
+  │ start, end = parse_deadline_file('.deadline')
+  │ … +3 lines
+  └ 2026-04-03 15:55:07
+    2026-04-03 18:55:07
+
+────────────────────────────────────────────────────────────────────────────────
+
+• Training has started with a moderate configuration to benchmark iteration
+  speed and checkpoint generation on the actual hardware. I’m using that result
+  to decide whether to scale the final run up or down.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 2 --no-auto-resume --games-per-iteration 16 --simulations-
+per-move 64 --evaluation-simulations 128 --steps-per-iteration 64 --batch-size
+256
+
+• There’s a benign NumPy warning in the visit-temperature calculation. I’m
+  letting this benchmark finish, then I’ll patch it out before the longer run so
+  the training log stays clean.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 2 --no-auto-resume --games-per-iteration 16 --simulations-
+per-move 64 --evaluation-simulations 128 --steps-per-iteration 64 --batch-size
+256
+
+• Ran python3 -m connect4_zero.cli train --ignore-deadline --iterations 2
+  │ --no-auto-resume --games-per-iteration 16 --simulations-per-move 64
+  │ --evaluation-simulations 128 --steps-per-iteration 64 --batch-size 256
+  └ Starting a new training run.
+    /workspace/connect4_zero/mcts.py:202: UserWarning: 'where' used without
+    … +12 lines
+    root_move=5 root_visits=128 root_value=0.5050
+    Requested iteration target reached.
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The speed is good: two moderate iterations finished quickly on GPU and
+  produced checkpoints. I’m cleaning the one noisy warning now, then I’ll launch
+  a longer run off the saved checkpoint.
+
+• Edited connect4_zero/mcts.py (+3 -2)
+    201              return policy
+    202 -        scaled = np.power(visit_counts, 1.0 / temperature, where=visit_
+         counts > 0)
+    202 +        scaled = np.zeros_like(visit_counts, dtype=np.float32)
+    203 +        positive = visit_counts > 0
+    204 +        scaled[positive] = np.power(visit_counts[positive], 1.0 / tempe
+         rature)
+    205          total = float(scaled.sum())
+        ⋮
+    240      return [action for action in center_priority if action in action_se
+         t]
+    239 -
+
+• Waited for background terminal · pytest -q
+
+• Ran pytest -q
+  └ .....................
+    [100%]
+    21 passed in 3.75s
+
+• Ran python3 -m connect4_zero.cli train --ignore-deadline --iterations 62
+  └ Auto-resuming from checkpoints/latest.pt
+    Traceback (most recent call last):
+    … +18 lines
+        default_generator.set_state(new_state)
+    TypeError: RNG state must be a torch.ByteTensor
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The longer run is resuming from the saved checkpoint. I’m letting it
+  accumulate iterations and will sample the log periodically so I can catch
+  regressions, instability, or a plateau instead of just waiting blind.
+
+• Waited for background terminal
+
+• Resume exposed a real checkpoint bug: the saved RNG state isn’t loading back
+  into torch.set_rng_state() cleanly. I’m inspecting the serialized types,
+  fixing the loader to normalize them, then I’ll rerun the full test suite and
+  continue training from the repaired checkpoint.
+
+• Explored
+  └ List checkpoints
+
+• Ran python3 - <<'PY'
+  │ import torch
+  │ ckpt = torch.load('checkpoints/latest.pt', map_location='cpu',
+  │ … +6 lines
+  └ numpy <class 'dict'> None None
+    python <class 'tuple'> None None
+    torch <class 'torch.Tensor'> torch.uint8 torch.Size([5056])
+    torch_cuda <class 'list'> None None
+    list len 1 first type <class 'torch.Tensor'>
+
+• Edited connect4_zero/training.py (+21 -3)
+    388      def load_checkpoint(cls, path: str | Path, *, device: str | None =
+         None) -> "Trainer":
+    389 -        checkpoint = torch.load(path, map_location=device or "cpu", wei
+         ghts_only=False)
+    389 +        checkpoint = torch.load(path, map_location="cpu", weights_only=
+         False)
+    390          training_config = TrainingConfig(**checkpoint["training_config"
+         ])
+        ⋮
+    401          trainer.optimizer.load_state_dict(checkpoint["optimizer_state"]
+         )
+    402 +        _move_optimizer_state_to_device(trainer.optimizer, trainer.devi
+         ce)
+    403          trainer.scheduler.load_state_dict(checkpoint["scheduler_state"]
+         )
+        ⋮
+    410          random.setstate(rng_state["python"])
+    410 -        torch.set_rng_state(rng_state["torch"])
+    411 +        torch.set_rng_state(_ensure_cpu_rng_tensor(rng_state["torch"]))
+    412          if torch.cuda.is_available() and rng_state["torch_cuda"] is not
+          None:
+    412 -            torch.cuda.set_rng_state_all(rng_state["torch_cuda"])
+    413 +            torch.cuda.set_rng_state_all(
+    414 +                [_ensure_cpu_rng_tensor(single_state) for single_state
+         in rng_state["torch_cuda"]]
+    415 +            )
+    416          return trainer
+        ⋮
+    441      return lines
+    442 +
+    443 +
+    444 +def _ensure_cpu_rng_tensor(value: Any) -> torch.Tensor:
+    445 +    if torch.is_tensor(value):
+    446 +        tensor = value.detach().to(device="cpu", dtype=torch.uint8)
+    447 +    else:
+    448 +        tensor = torch.as_tensor(value, dtype=torch.uint8, device="cpu"
+         )
+    449 +    return tensor.contiguous()
+    450 +
+    451 +
+    452 +def _move_optimizer_state_to_device(optimizer: AdamW, device: torch.dev
+         ice) -> None:
+    453 +    for state in optimizer.state.values():
+    454 +        for key, value in list(state.items()):
+    455 +            if torch.is_tensor(value):
+    456 +                state[key] = value.to(device)
+
+• Waited for background terminal · pytest -q
+
+• Ran pytest -q
+  └ .....................
+    [100%]
+    21 passed in 3.78s
+
+• Ran python3 - <<'PY'
+  │ from connect4_zero.training import Trainer
+  │ trainer = Trainer.load_checkpoint('checkpoints/latest.pt', device='cuda')
+  │ … +3 lines
+  └ loaded iteration 2 device cuda
+    lr 0.001
+
+• Waited for background terminal
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 62
+
+─ Worked for 1m 06s ────────────────────────────────────────────────────────────
+
+• The resumed run is healthy: losses are staying bounded and the empty-board
+  root preference has already settled back toward the center column, which is
+  what I want to see early. I’m letting it keep climbing.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 62
+
+• The run is still stable, but the loss curve has flattened and the opening
+  preference is oscillating between center-adjacent moves. I’m keeping it going
+  through the first LR drop; that’s the next useful signal.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 62
+
+• The first LR decay helped a bit: policy loss is trending down even though
+  value loss is still noisy. I’m taking this through a few more iterations
+  before deciding whether to stop on this checkpoint family or restart with a
+  different self-play budget.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 62
+
+• The value head hasn’t really settled yet, but the search prior is now
+  consistently preferring the center column family. I’m taking it to the next
+  checkpoint block and then I’ll evaluate whether this run is good enough to
+  keep as the shipped model.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 62
+
+• The second LR drop helped materially. Loss is now moving in the right
+  direction again and the empty-board probe is stable on column 4, so I’m
+  continuing this run rather than restarting it.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 62
+
+• The run is nearing another scheduler step. I’m taking it through that boundary
+  and then I’ll stop to validate the saved checkpoint with the actual player.sh
+  path instead of optimizing blindly.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 62
+
+• This checkpoint family is improving again after the latest LR step. I’m going
+  a bit further because the policy head is still tightening and the opening
+  probe is stable.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 62
+
+• The checkpoint is usable already, but there’s still room and the run is
+  inexpensive, so I’m letting it keep going to harvest a stronger best.pt before
+  I switch over to end-to-end validation.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 62
+
+• The fourth scheduler step landed cleanly. I’m watching for any collapse after
+  the LR cut, but so far the model is holding its opening preference and the
+  loss floor is nudging down.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 62
+
+• The best observed loss has improved again in the 40s, so the extra runtime is
+  still paying for itself. I’m letting the run finish rather than cutting it
+  short.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 62
+
+• Another LR drop and another new low came with it. I’m just riding this out to
+  the planned stop since the checkpoint is still improving and the buffer hasn’t
+  even started to turn over yet.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 62
+
+• The later iterations are drifting toward more draws in self-play, which is a
+  reasonable sign for a stronger symmetric policy in Connect 4. I’m finishing
+  the run, then I’ll validate the shipped move path against real game_state.txt
+  inputs.
+
+• Waited for background terminal · python3 -m connect4_zero.cli train --ignore-
+deadline --iterations 62
+
+• Ran python3 -m connect4_zero.cli train --ignore-deadline --iterations 62
+  └ Auto-resuming from checkpoints/latest.pt
+    [iter 3] self-play: X 0.812 | O 0.188 | draw 0.000 | avg_len 19.19 | buffer
+    … +184 lines
+    root_move=4 root_visits=128 root_value=0.2133
+    Requested iteration target reached.
+
+─ Worked for 10m 55s ───────────────────────────────────────────────────────────
+
+• The long run is finished. I’m switching from training to validation now:
+  inspecting the saved artifacts, timing player.sh, and checking a few concrete
+  board states end-to-end through the actual competition interface.
+
+• Explored
+  └ List checkpoints
+    Read training_log.csv
+
+• Ran python3 - <<'PY'
+  │ import torch
+  │ for name in ['checkpoints/latest.pt','checkpoints/best.pt']:
+  │ … +3 lines
+  └ checkpoints/latest.pt iter 62 best_loss 0.889924943447113
+    checkpoints/best.pt iter 61 best_loss 0.889924943447113
+
+• Ran printf '112233' > game_state.txt && rm -f next_move.txt && /usr/bin/time
+  │ -f '%e' bash ./player.sh && printf ' move=' && cat next_move.txt
+  └ /bin/bash: line 1: /usr/bin/time: No such file or directory
+
+• Ran printf '1122334' > game_state.txt && rm -f next_move.txt && bash ./
+  │ player.sh && printf ' move=' && cat next_move.txt
+  └  move=LOSS
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I hit one shell-policy issue and one environment issue while timing player.sh,
+  so I’m re-running the validations in smaller commands and measuring duration
+  from Python instead of relying on /usr/bin/time.
+
+• Ran python3 - <<'PY'
+  │ from pathlib import Path
+  │ import subprocess, time, os
+  │ … +10 lines
+  └ cpu_elapsed 1.794
+    move 4
+
+• Ran python3 - <<'PY'
+  │ from pathlib import Path
+  │ import subprocess, time
+  │ … +8 lines
+  └ elapsed 2.072
+    move 4
+
+• Ran python3 - <<'PY'
+  │ from pathlib import Path
+  │ import subprocess, time
+  │ … +8 lines
+  └ elapsed 2.117
+    move 4
+
+• Waited for background terminal
+
+• Waited for background terminal
+
+• Waited for background terminal
+
+• Ran python3 - <<'PY'
+  │ import subprocess, time
+  │ start = time.time()
+  │ … +3 lines
+  └ elapsed 0.002
+
+• Ran printf 'q
+  │ ' | python3 -m connect4_zero.cli human-vs-model --device cpu --simulations
+  │ 32 --human-first
+  └
+      1 2 3 4 5 6 7
+    … +5 lines
+    1 . . . . . . .
+    Player 1 (X), choose column 1-7:
+
+• Waited for background terminal
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’ve finished the functional validation. The last repo update is the project
+  log: recording the architecture, the final training outcome, and the
+  entrypoint behavior so a later instance can pick this up without re-deriving
+  context.
+
+• Edited CODEX.md (+65 -9)
+    23  - Entry points: `python3 -m connect4_zero.cli ...`, plus `/workspace/pla
+        yer.sh`
+    24 +- Competition move selection: trained-network-guided MCTS only, with 480
+         simulations in `player.sh`
+    25
+    26 +## Architecture Notes
+    27 +- `connect4_zero/game.py`
+    28 +  - Canonical game state, move legality, win detection, tensor encoding,
+         history parsing/rendering
+    29 +- `connect4_zero/network.py`
+    30 +  - Residual CNN: stem -> residual tower -> policy/value heads
+    31 +- `connect4_zero/mcts.py`
+    32 +  - PUCT search, root Dirichlet noise for self-play, visit-count policy
+        extraction, child statistics
+    33 +- `connect4_zero/replay.py`
+    34 +  - Fixed-capacity replay buffer with checkpoint serialization
+    35 +- `connect4_zero/training.py`
+    36 +  - Self-play generation, SGD loop, CSV logging, checkpoint save/load, d
+        eadline parsing, SIGINT handling
+    37 +- `connect4_zero/cli.py`
+    38 +  - Human-vs-human, training, human-vs-model, and competition modes
+    39 +
+    40 +## Design Rationale
+    41 +- Dense board arrays were chosen over bitboards because they made termin
+        al rendering, tests, checkpoint readability, and augmentation simpler wi
+        thout creating a real performance bottleneck for this project size.
+    42 +- The residual CNN uses 64 channels and 6 residual blocks by default. Th
+        at is larger than the minimum needed for a toy implementation but still
+        cheap enough to train quickly on the available GPU and small enough for
+        CPU move selection.
+    43 +- Self-play stores both original and horizontally mirrored samples to do
+        uble effective data volume and reinforce board symmetry.
+    44 +- Per-iteration MCTS logging is taken from an empty-board probe search a
+        fter training. This gives a stable apples-to-apples indicator of opening
+         preference over time.
+    45 +- Checkpoints always save `latest.pt`, and `best.pt` tracks the lowest f
+        inite training loss seen so far.
+    46 +
+    47  ## Progress
+       ⋮
+    49  - [x] Confirm runtime and hardware availability
+    28 -- [ ] Implement core game engine
+    29 -- [ ] Implement tests for game engine
+    30 -- [ ] Implement training stack
+    31 -- [ ] Implement checkpoint/resume and tests
+    32 -- [ ] Implement competition scripts
+    33 -- [ ] Run training and save final artifacts
+    50 +- [x] Implement core game engine
+    51 +- [x] Implement tests for game engine
+    52 +- [x] Implement training stack
+    53 +- [x] Implement checkpoint/resume and tests
+    54 +- [x] Implement competition scripts
+    55 +- [x] Run training and save final artifacts
+    56 +
+    57 +## Training Outcome
+    58 +- Main run resumed from an initial benchmark checkpoint and trained thro
+        ugh iteration 62.
+    59 +- Final saved artifacts:
+    60 +  - `checkpoints/latest.pt`: iteration 62
+    61 +  - `checkpoints/best.pt`: iteration 61
+    62 +- Best recorded loss: `0.889924943447113`
+    63 +- Latest learning rate: `0.000117649`
+    64 +- Empty-board probe after the strongest checkpoints consistently preferr
+        ed column 4 (the center column).
+    65
+    66 +## Validation Performed
+    67 +- Full automated test suite: `21 passed`
+    68 +- Save/load/resume determinism test verifies:
+    69 +  - iteration count continuity
+    70 +  - learning-rate continuity
+    71 +  - optimizer state continuity, including momentum buffers
+    72 +- CLI competition path tested end-to-end:
+    73 +  - writes a legal move on non-terminal input
+    74 +  - writes `LOSS` on terminal loss input
+    75 +- `player.sh` smoke tests:
+    76 +  - empty state -> move `4`
+    77 +  - immediate win state `112233` -> move `4`
+    78 +  - terminal state `1122334` -> `LOSS`
+    79 +- `player.sh` latency in this workspace:
+    80 +  - GPU-visible environment: about 2.1s
+    81 +  - CPU-only simulated environment (`CUDA_VISIBLE_DEVICES=''`): about 1.
+        8s
+    82 +- `setup.sh` verified to no-op when checkpoints already exist
+    83 +
+    84 +## Artifacts
+    85 +- `artifacts/training_log.csv`
+    86 +- `checkpoints/best.pt`
+    87 +- `checkpoints/latest.pt`
+    88 +- `player.sh`
+    89 +- `setup.sh`
+    90 +
+    91  ## Environment Notes
+       ⋮
+    96  ## Known Risks / Watch Items
+    41 -- Resume-identical tests must avoid nondeterministic GPU behavior; tests
+         should run on CPU
+    42 -- Competition script must stay comfortably within the 30 second move bud
+        get on CPU
+    43 -- Training strength depends on available runtime before deadline; preser
+        ve the best checkpoint continuously
+    97 +- Resume-identical tests still rely on CPU determinism; keep that test o
+        n CPU if the stack is changed later
+    98 +- The model is materially trained, but it is not guaranteed to be perfec
+        t Connect 4 play; the competitive strength is bounded by the self-play b
+        udget used here
+    99 +- Replay turnover never activated during this run because the buffer cap
+        acity was much larger than the generated sample count
+
+────────────────────────────────────────────────────────────────────────────────
+
+• Implemented the full project in connect4_zero/game.py, connect4_zero/
+  network.py, connect4_zero/mcts.py, connect4_zero/replay.py, connect4_zero/
+  training.py, and connect4_zero/cli.py. The repo now has terminal human-vs-
+  human play, AlphaZero-style self-play training with per-iteration CSV logging,
+  checkpoint/resume with RNG/optimizer/scheduler state, SIGINT handling, human-
+  vs-model play, and the competition entrypoints player.sh and setup.sh. The
+  project log and decisions are in CODEX.md.
+
+  Validation is in place with 21 passing tests under tests/test_game.py, tests/
+  test_training.py, and tests/test_cli.py. I also trained and saved model
+  artifacts at checkpoints/best.pt and checkpoints/latest.pt, with iteration
+  logs in artifacts/training_log.csv. The long run reached iteration 62; best.pt
+  is from iteration 61 with best loss 0.889924943447113. player.sh was smoke-
+  tested end-to-end: empty state -> 4, 112233 -> 4, 1122334 -> LOSS, and
+  simulated CPU runtime was about 1.8s.
+Token usage: total=93,432 input=35,107 (+ 4,957,312 cached) output=58,325 (reasoning 29,018)
+To continue this session, run codex resume 019d5520-dc8d-7a03-a53f-c28f643541af
+Script done.

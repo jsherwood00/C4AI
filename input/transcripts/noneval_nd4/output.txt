@@ -1,0 +1,3885 @@
+johnk@rt1:~/Documents$ timeout --signal=TERM --kill-after=30s 3h codex --yolo
+
+╭───────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.116.0)            │
+│                                       │
+│ model:     gpt-5.4   /model to change │
+│ directory: ~/Documents                │
+╰───────────────────────────────────────╯
+
+  Tip: New Use /fast to enable our fastest inference at 2X plan usage.
+
+• Model changed to gpt-5.4 xhigh
+
+• Fast mode set to on
+
+
+› hey theres a project I'd like to work on, can you help me
+
+
+• Yes. Share the project and what you want to do next.
+
+  Useful starting points:
+
+  - what the project is
+  - where the code lives
+  - what’s currently blocked
+  - what outcome you want
+
+  If you want, I can start by inspecting the repo once you point me to it.
+
+
+› I'd like to use mcts alpha go style techniques to make a model that is strong
+  enough to play near-optimally or optimally against expert connect 4 play (my
+  friend says he has never  lost but I want to challenge him!). Could you write
+  code and tests as needed, and then start and monitor a training run with the
+  goal of getting as close to optimal play as possible? Important to only use
+  alpha zero techniques: dont return any lazy shortcuts like minimax solvers
+  (although feel free to use them if you wish during training)! oh and please
+  do not hand the conversation turn back to me until you are confident the
+  model you have trained is near optimal: you can measure this whatever way you
+  want. In other words, please keep a foreground terminal monitoring for the
+  duration of this task monitoring the background ones so I can easily look and
+  see updates without having to type in any new commands. For gpu access, I've
+  been using pytorch nightly and cuda 12.8: try those.
+
+
+• I’m going to inspect the workspace first, identify or create the project area,
+  and check the Python/PyTorch/CUDA environment before I implement the
+  AlphaZero-style Connect 4 pipeline.
+
+• Ran pwd
+  └ /home/johnk/Documents
+
+• Explored
+  └ List ls -la
+
+• Ran python --version && which python && python - <<'PY'
+  │ import sys
+  │ print(sys.executable)
+  │ … +11 lines
+  └ /bin/bash: line 1: python: command not found
+
+• Explored
+  └ List rg --files -g pyproject.toml -g 'requirements*.txt' -g
+setup.py -g .python-
+         version -g 'environment*.yml' -g 'README*'
+
+────────────────────────────────────────────────────────────────────────────────
+
+• There isn’t an obvious existing Python project here, and python isn’t on PATH.
+  I’m checking the likely project directories and the available Python
+  executables so I can build this in the right place and use the installed
+  PyTorch/CUDA stack.
+
+• Explored
+  └ List .
+    List experiments
+    List experiments
+
+• Ran command -v python3 || true; command -v uv || true; command -v conda ||
+  │ true; command -v mamba || true; command -v pip || true; command -v pip3 ||
+  │ true
+  └ /usr/bin/python3
+    /usr/bin/pip
+    /usr/bin/pip3
+
+• Ran python3 --version && which python3 && python3 - <<'PY'
+  │ import sys
+  │ print(sys.executable)
+  │ … +11 lines
+  └ Python 3.12.3
+    /usr/bin/python3
+    /usr/bin/python3
+    torch_check_error ModuleNotFoundError("No module named 'torch'")
+
+────────────────────────────────────────────────────────────────────────────────
+
+• There is a /home/johnk/Documents/connect4 directory already. I’m inspecting
+  that before I decide whether to extend it or scaffold a clean training project
+  around it.
+
+• Explored
+  └ List connect4
+    List connect4
+    Search torch|connect4|alphazero|mcts|train|self.?play in connect4
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The connect4 directory is empty, so I’ll build the project there. Next I’m
+  checking GPU visibility and whether I can create a dedicated virtual
+  environment with PyTorch nightly + CUDA 12.8 rather than polluting the system
+  install.
+
+• Ran nvidia-smi
+  └ Wed Mar 25 12:36:06 2026
+    +---------------------------------------------------------------------------
+    … +28 lines
+    +---------------------------------------------------------------------------
+    --------------+
+
+• Ran python3 -m venv /home/johnk/Documents/connect4/.venv && /home/johnk/
+  │ Documents/connect4/.venv/bin/python -V && /home/johnk/Documents/
+  │ connect4/.venv/bin/pip -V
+  └ Python 3.12.3
+    pip 24.0 from /home/johnk/Documents/connect4/.venv/lib/python3.12/
+    site-packages/pip (python 3.12)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The GPU is visible, and I’ve started provisioning a project-local virtualenv.
+  Once that’s settled, I’ll install the nightly CUDA build and begin writing the
+  game engine, MCTS, network, tests, and training loop.
+
+• Model interrupted to submit steer instructions.
+
+
+› oh also I want this to be as strong as possible: idc how long it takes or how
+  much compute resources you use btw: thats not a problem, but if you could
+  have something near optimal by the time I get back from the gym / taking a
+  nap (going to gym rn and should be done with both those and a snack break
+  around 3 hours from now) that would be great. I want you to make the best
+  model you can for me so please use all of that 3 hours of time unless you
+  think there isnt like any reason to, sound good?  I dont want to have to
+  restart things / delay my day: when I get back I'll check and hopefully what
+  I'll see is extensive logging of everything and a fully complete run with a
+  command that works that I can run and then have my friend play interactively
+  against. oh last thing can you make it feel realistic like a real connect4
+  physical setup so he just has to type a number between 1 and 7 to play each
+  move? he also said something about being fine giving up the first player
+  advantage so lets take him up on that but he'll probably lose since ik u can
+  make something good haha so having a way for him to play as either first or
+  second would be nice!
+
+
+• I’m switching from inspection to implementation. The plan is to build a clean
+  local package in /home/johnk/Documents/connect4, use a solver only as a
+  training/evaluation oracle, and keep the final playing agent strictly neural-
+  network-plus-MCTS.
+
+  1. in_progress Create the project scaffold, exact game engine, tests, and a
+     reproducible venv install with PyTorch nightly CUDA 12.8.
+  2. pending Implement the AlphaZero stack: residual policy/value net, PUCT
+     MCTS, replay buffer, supervised warm start from solver labels, and self-
+     play fine-tuning.
+  3. pending Add an interactive CLI so a human can play by typing 1-7, with
+     options to move first or second and a physical-board-style display.
+  4. pending Start a long training run, keep a live monitor running in the
+     foreground, and evaluate against the solver until the model is close enough
+     to optimal to justify stopping.
+
+• Updated Plan
+  └ Building a Connect 4 AlphaZero-style project from scratch in the empty /
+    home/johnk/Documents/connect4 directory, then running a long training/eval
+    cycle with monitoring.
+    □ Create project scaffold, exact game engine, tests, and venv with PyTorch
+      nightly CUDA 12.8
+    □ Implement AlphaZero components: network, MCTS, solver-guided pretraining,
+      self-play fine-tuning
+    □ Add interactive human-vs-agent CLI with first/second player options and
+      physical board display
+    □ Run monitored training/evaluation until the network+MCTS agent is near-
+      optimal
+
+• I’m writing the project from scratch in connect4 and installing the runtime
+  stack into .venv. The first concrete dependency step is PyTorch nightly with
+  CUDA 12.8 plus a small testing/training toolchain.
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pip install --upgrade pip
+  │ setuptools wheel
+  └ Collecting pip
+      Using cached pip-26.0.1-py3-none-any.whl.metadata (4.7 kB)
+    … +15 lines
+    Successfully installed packaging-26.0 pip-26.0.1 setuptools-82.0.1
+    wheel-0.46.3
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pip install pytest numpy tqdm
+  │ psutil
+  └ Collecting pytest
+      Using cached pytest-9.0.2-py3-none-any.whl.metadata (7.6 kB)
+    … +26 lines
+    Successfully installed iniconfig-2.3.0 numpy-2.4.3 packaging-26.0
+    pluggy-1.6.0 psutil-7.2.2 pygments-2.19.2 pytest-9.0.2 tqdm-4.67.3
+
+• Ran mkdir -p /home/johnk/Documents/connect4/src/connect4_az /home/johnk/
+  │ Documents/connect4/tests /home/johnk/Documents/connect4/logs /home/johnk/
+  │ Documents/connect4/runs
+  └ (no output)
+
+─ Worked for 1m 58s ────────────────────────────────────────────────────────────
+
+• The dependency install is still in flight. While that finishes, I’m putting
+  the core package structure in place so I can immediately move into tests and
+  smoke runs instead of waiting on scaffolding later.
+
+• Waited for background terminal
+
+• Waited for background terminal · /home/johnk/Documents/connect4/.venv/bin/pip
+install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu128
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pip install --pre torch --index-
+  │ url https://download.pytorch.org/whl/nightly/cu128
+  └ Collecting torch
+      Using cached
+    … +108 lines
+    sympy-1.14.0 torch-2.12.0.dev20260325+cu128 triton-3.6.0+git9844da95
+    typing-extensions-4.15.0
+
+─ Worked for 2m 13s ────────────────────────────────────────────────────────────
+
+• I’m at the point where file edits start. I’m adding the package skeleton, the
+  bitboard game engine, the exact-value solver scaffold, the neural net, MCTS,
+  the training/eval/monitor CLIs, and an initial test suite so I can immediately
+  tighten correctness with pytest.
+
+• Edited 12 files (+1342 -0)
+  └ connect4/README.md (+14 -0)
+     1 +# Connect 4 AlphaZero
+     2 +
+     3 +This project trains a Connect 4 policy/value network and uses PUCT MCTS
+        at
+     4 +inference time. An exact alpha-beta solver is included for data generati
+        on and
+     5 +evaluation only.
+     6 +
+     7 +Main commands:
+     8 +
+     9 +```bash
+    10 +.venv/bin/pip install -e .
+    11 +.venv/bin/connect4-az train --run-dir runs/default
+    12 +.venv/bin/connect4-az play --checkpoint runs/default/best.pt --human fir
+        st
+    13 +.venv/bin/connect4-az play --checkpoint runs/default/best.pt --human sec
+        ond
+    14 +```
+
+  └ connect4/pyproject.toml (+31 -0)
+     1 +[build-system]
+     2 +requires = ["setuptools>=78", "wheel"]
+     3 +build-backend = "setuptools.build_meta"
+     4 +
+     5 +[project]
+     6 +name = "connect4-az"
+     7 +version = "0.1.0"
+     8 +description = "AlphaZero-style Connect 4 training and play pipeline"
+     9 +readme = "README.md"
+    10 +requires-python = ">=3.12"
+    11 +dependencies = [
+    12 +  "numpy>=2.4",
+    13 +  "psutil>=7.2",
+    14 +  "torch>=2.12.0.dev0",
+    15 +  "tqdm>=4.67",
+    16 +]
+    17 +
+    18 +[project.optional-dependencies]
+    19 +dev = ["pytest>=9.0"]
+    20 +
+    21 +[project.scripts]
+    22 +connect4-az = "connect4_az.cli:main"
+    23 +
+    24 +[tool.setuptools]
+    25 +package-dir = {"" = "src"}
+    26 +
+    27 +[tool.setuptools.packages.find]
+    28 +where = ["src"]
+    29 +
+    30 +[tool.pytest.ini_options]
+    31 +testpaths = ["tests"]
+
+  └ connect4/src/connect4_az/__init__.py (+6 -0)
+    1 +"""Connect 4 AlphaZero package."""
+    2 +
+    3 +from connect4_az.game import Connect4State
+    4 +from connect4_az.model import Connect4Net
+    5 +
+    6 +__all__ = ["Connect4Net", "Connect4State"]
+
+  └ connect4/src/connect4_az/cli.py (+174 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import argparse
+      4 +import json
+      5 +import os
+      6 +import sys
+      7 +import time
+      8 +from pathlib import Path
+      9 +
+     10 +import numpy as np
+     11 +import torch
+     12 +
+     13 +from connect4_az.game import COLUMNS, Connect4State
+     14 +from connect4_az.mcts import MCTSConfig, run_mcts
+     15 +from connect4_az.training import TrainConfig, load_model_from_checkpoin
+         t, train
+     16 +
+     17 +
+     18 +def _build_parser() -> argparse.ArgumentParser:
+     19 +    parser = argparse.ArgumentParser(prog="connect4-az")
+     20 +    subparsers = parser.add_subparsers(dest="command", required=True)
+     21 +
+     22 +    train_parser = subparsers.add_parser("train", help="train the Conne
+         ct 4 model")
+     23 +    train_parser.add_argument("--run-dir", type=Path, required=True)
+     24 +    train_parser.add_argument("--device", default="cuda")
+     25 +    train_parser.add_argument("--hours", type=float, default=3.0)
+     26 +    train_parser.add_argument("--seed", type=int, default=0)
+     27 +    train_parser.add_argument("--solver-train-positions", type=int, def
+         ault=30000)
+     28 +    train_parser.add_argument("--solver-val-positions", type=int, defau
+         lt=4000)
+     29 +    train_parser.add_argument("--pretrain-epochs", type=int, default=20
+         )
+     30 +    train_parser.add_argument("--self-play-iterations", type=int, defau
+         lt=12)
+     31 +    train_parser.add_argument("--self-play-games", type=int, default=12
+         0)
+     32 +    train_parser.add_argument("--self-play-epochs", type=int, default=4
+         )
+     33 +    train_parser.add_argument("--train-mcts-simulations", type=int, def
+         ault=256)
+     34 +    train_parser.add_argument("--eval-mcts-simulations", type=int, defa
+         ult=512)
+     35 +    train_parser.add_argument("--play-mcts-simulations", type=int, defa
+         ult=1600)
+     36 +    train_parser.add_argument("--channels", type=int, default=96)
+     37 +    train_parser.add_argument("--blocks", type=int, default=6)
+     38 +    train_parser.add_argument("--batch-size", type=int, default=512)
+     39 +    train_parser.add_argument("--lr", type=float, default=2e-3)
+     40 +    train_parser.add_argument("--weight-decay", type=float, default=1e-
+         4)
+     41 +    train_parser.add_argument("--min-random-depth", type=int, default=8
+         )
+     42 +    train_parser.add_argument("--max-random-depth", type=int, default=2
+         8)
+     43 +    train_parser.add_argument("--final-eval-positions", type=int, defau
+         lt=1000)
+     44 +
+     45 +    play_parser = subparsers.add_parser("play", help="play against the
+         trained model")
+     46 +    play_parser.add_argument("--checkpoint", type=Path, required=True)
+     47 +    play_parser.add_argument("--human", choices=("first", "second"), de
+         fault="first")
+     48 +    play_parser.add_argument("--device", default="cuda")
+     49 +    play_parser.add_argument("--simulations", type=int, default=1600)
+     50 +
+     51 +    eval_parser = subparsers.add_parser("monitor", help="tail the run s
+         tatus")
+     52 +    eval_parser.add_argument("--run-dir", type=Path, required=True)
+     53 +    eval_parser.add_argument("--refresh-seconds", type=float, default=5
+         .0)
+     54 +
+     55 +    return parser
+     56 +
+     57 +
+     58 +def _command_train(args: argparse.Namespace) -> int:
+     59 +    config = TrainConfig(
+     60 +        seed=args.seed,
+     61 +        device=args.device,
+     62 +        hours=args.hours,
+     63 +        solver_train_positions=args.solver_train_positions,
+     64 +        solver_val_positions=args.solver_val_positions,
+     65 +        pretrain_epochs=args.pretrain_epochs,
+     66 +        self_play_iterations=args.self_play_iterations,
+     67 +        self_play_games=args.self_play_games,
+     68 +        self_play_epochs=args.self_play_epochs,
+     69 +        train_mcts_simulations=args.train_mcts_simulations,
+     70 +        eval_mcts_simulations=args.eval_mcts_simulations,
+     71 +        play_mcts_simulations=args.play_mcts_simulations,
+     72 +        channels=args.channels,
+     73 +        blocks=args.blocks,
+     74 +        batch_size=args.batch_size,
+     75 +        lr=args.lr,
+     76 +        weight_decay=args.weight_decay,
+     77 +        min_random_depth=args.min_random_depth,
+     78 +        max_random_depth=args.max_random_depth,
+     79 +        final_eval_positions=args.final_eval_positions,
+     80 +    )
+     81 +    result = train(args.run_dir, config)
+     82 +    print(json.dumps(result, indent=2, sort_keys=True))
+     83 +    return 0
+     84 +
+     85 +
+     86 +def _command_play(args: argparse.Namespace) -> int:
+     87 +    device = torch.device(args.device if args.device != "cuda" or torch
+         .cuda.is_available() else "cpu")
+     88 +    model, metadata = load_model_from_checkpoint(args.checkpoint, devic
+         e)
+     89 +    state = Connect4State()
+     90 +    human_player = 1 if args.human == "first" else -1
+     91 +    mcts_config = MCTSConfig(simulations=args.simulations, dirichlet_ep
+         silon=0.0)
+     92 +    print("Connect 4")
+     93 +    print(f"Human plays {'first' if human_player == 1 else 'second'}.")
+     94 +    if metadata:
+     95 +        print(f"Checkpoint summary: {json.dumps(metadata, sort_keys=Tru
+         e)}")
+     96 +    while not state.is_terminal():
+     97 +        print()
+     98 +        print(state.render(human_player=human_player))
+     99 +        if state.to_play == human_player:
+    100 +            while True:
+    101 +                raw = input("Choose a column (1-7): ").strip()
+    102 +                if raw.lower() in {"q", "quit", "exit"}:
+    103 +                    return 0
+    104 +                if raw.isdigit():
+    105 +                    move = int(raw) - 1
+    106 +                    if 0 <= move < COLUMNS and state.can_play(move):
+    107 +                        break
+    108 +                print("Invalid move. Type a number from 1 to 7 for a no
+         n-full column.")
+    109 +            state = state.play(move)
+    110 +            continue
+    111 +        print("Agent is thinking...")
+    112 +        visit_distribution, visit_map = run_mcts(model, state, device,
+         mcts_config, add_noise=False)
+    113 +        move = int(np.argmax(visit_distribution))
+    114 +        ordered = sorted(visit_map.items(), key=lambda item: item[1], r
+         everse=True)
+    115 +        summary = ", ".join(f"{column + 1}:{visits}" for column, visits
+          in ordered[:3])
+    116 +        print(f"Agent plays column {move + 1} ({summary})")
+    117 +        state = state.play(move)
+    118 +    print()
+    119 +    print(state.render(human_player=human_player))
+    120 +    winner = state.winner()
+    121 +    if winner == 0:
+    122 +        print("Draw.")
+    123 +    elif winner == human_player:
+    124 +        print("Human wins.")
+    125 +    else:
+    126 +        print("Agent wins.")
+    127 +    return 0
+    128 +
+    129 +
+    130 +def _command_monitor(args: argparse.Namespace) -> int:
+    131 +    run_dir: Path = args.run_dir
+    132 +    status_path = run_dir / "logs" / "status.json"
+    133 +    train_log = run_dir / "logs" / "train.jsonl"
+    134 +    eval_log = run_dir / "logs" / "eval.jsonl"
+    135 +    while True:
+    136 +        os.system("clear")
+    137 +        print(f"Run dir: {run_dir}")
+    138 +        print(f"Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    139 +        print()
+    140 +        if status_path.exists():
+    141 +            print(status_path.read_text(encoding="utf-8"))
+    142 +        else:
+    143 +            print("status.json not written yet")
+    144 +        print()
+    145 +        for label, path in (("train", train_log), ("eval", eval_log)):
+    146 +            print(f"Last {label} records:")
+    147 +            if path.exists():
+    148 +                lines = path.read_text(encoding="utf-8").strip().splitl
+         ines()
+    149 +                for line in lines[-5:]:
+    150 +                    print(line)
+    151 +            else:
+    152 +                print("  no log entries yet")
+    153 +            print()
+    154 +        try:
+    155 +            time.sleep(args.refresh_seconds)
+    156 +        except KeyboardInterrupt:
+    157 +            return 0
+    158 +
+    159 +
+    160 +def main(argv: list[str] | None = None) -> int:
+    161 +    parser = _build_parser()
+    162 +    args = parser.parse_args(argv)
+    163 +    if args.command == "train":
+    164 +        return _command_train(args)
+    165 +    if args.command == "play":
+    166 +        return _command_play(args)
+    167 +    if args.command == "monitor":
+    168 +        return _command_monitor(args)
+    169 +    parser.error(f"unknown command {args.command}")
+    170 +    return 2
+    171 +
+    172 +
+    173 +if __name__ == "__main__":
+    174 +    raise SystemExit(main(sys.argv[1:]))
+
+  └ connect4/src/connect4_az/game.py (+208 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +from dataclasses import dataclass
+      4 +from typing import Iterable
+      5 +
+      6 +import numpy as np
+      7 +
+      8 +ROWS = 6
+      9 +COLUMNS = 7
+     10 +BITS_PER_COLUMN = ROWS + 1
+     11 +MAX_MOVES = ROWS * COLUMNS
+     12 +MOVE_ORDER = (3, 2, 4, 1, 5, 0, 6)
+     13 +
+     14 +BOTTOM_MASKS = tuple(1 << (column * BITS_PER_COLUMN) for column in rang
+         e(COLUMNS))
+     15 +TOP_MASKS = tuple(1 << (column * BITS_PER_COLUMN + ROWS - 1) for column
+          in range(COLUMNS))
+     16 +COLUMN_MASKS = tuple(((1 << ROWS) - 1) << (column * BITS_PER_COLUMN) fo
+         r column in range(COLUMNS))
+     17 +
+     18 +
+     19 +def has_alignment(bits: int) -> bool:
+     20 +    vertical = bits & (bits >> 1)
+     21 +    if vertical & (vertical >> 2):
+     22 +        return True
+     23 +    horizontal = bits & (bits >> BITS_PER_COLUMN)
+     24 +    if horizontal & (horizontal >> (2 * BITS_PER_COLUMN)):
+     25 +        return True
+     26 +    diagonal_up = bits & (bits >> (BITS_PER_COLUMN + 1))
+     27 +    if diagonal_up & (diagonal_up >> (2 * (BITS_PER_COLUMN + 1))):
+     28 +        return True
+     29 +    diagonal_down = bits & (bits >> (BITS_PER_COLUMN - 1))
+     30 +    if diagonal_down & (diagonal_down >> (2 * (BITS_PER_COLUMN - 1))):
+     31 +        return True
+     32 +    return False
+     33 +
+     34 +
+     35 +def mirror_bits(bits: int) -> int:
+     36 +    mirrored = 0
+     37 +    for column in range(COLUMNS):
+     38 +        col_bits = bits & COLUMN_MASKS[column]
+     39 +        shift = (COLUMNS - 1 - 2 * column) * BITS_PER_COLUMN
+     40 +        if shift >= 0:
+     41 +            mirrored |= col_bits << shift
+     42 +        else:
+     43 +            mirrored |= col_bits >> (-shift)
+     44 +    return mirrored
+     45 +
+     46 +
+     47 +def lowest_empty_bit(mask: int, column: int) -> int:
+     48 +    if column < 0 or column >= COLUMNS:
+     49 +        raise ValueError(f"column must be between 0 and {COLUMNS - 1},
+         got {column}")
+     50 +    bit = (mask + BOTTOM_MASKS[column]) & COLUMN_MASKS[column]
+     51 +    if bit == 0:
+     52 +        raise ValueError(f"column {column} is full")
+     53 +    return bit
+     54 +
+     55 +
+     56 +@dataclass(frozen=True, slots=True)
+     57 +class Connect4State:
+     58 +    p1: int = 0
+     59 +    p2: int = 0
+     60 +    to_play: int = 1
+     61 +    moves_played: int = 0
+     62 +
+     63 +    @classmethod
+     64 +    def from_moves(cls, moves: Iterable[int]) -> "Connect4State":
+     65 +        state = cls()
+     66 +        for move in moves:
+     67 +            state = state.play(move)
+     68 +        return state
+     69 +
+     70 +    @property
+     71 +    def occupancy(self) -> int:
+     72 +        return self.p1 | self.p2
+     73 +
+     74 +    def can_play(self, column: int) -> bool:
+     75 +        return (self.occupancy & TOP_MASKS[column]) == 0
+     76 +
+     77 +    def legal_moves(self) -> tuple[int, ...]:
+     78 +        return tuple(column for column in range(COLUMNS) if self.can_pl
+         ay(column))
+     79 +
+     80 +    def ordered_legal_moves(self) -> tuple[int, ...]:
+     81 +        return tuple(column for column in MOVE_ORDER if self.can_play(c
+         olumn))
+     82 +
+     83 +    def play(self, column: int) -> "Connect4State":
+     84 +        if not self.can_play(column):
+     85 +            raise ValueError(f"column {column} is full")
+     86 +        bit = lowest_empty_bit(self.occupancy, column)
+     87 +        if self.to_play == 1:
+     88 +            return Connect4State(
+     89 +                p1=self.p1 | bit,
+     90 +                p2=self.p2,
+     91 +                to_play=-1,
+     92 +                moves_played=self.moves_played + 1,
+     93 +            )
+     94 +        return Connect4State(
+     95 +            p1=self.p1,
+     96 +            p2=self.p2 | bit,
+     97 +            to_play=1,
+     98 +            moves_played=self.moves_played + 1,
+     99 +        )
+    100 +
+    101 +    def winner(self) -> int:
+    102 +        if has_alignment(self.p1):
+    103 +            return 1
+    104 +        if has_alignment(self.p2):
+    105 +            return -1
+    106 +        return 0
+    107 +
+    108 +    def is_draw(self) -> bool:
+    109 +        return self.moves_played >= MAX_MOVES and self.winner() == 0
+    110 +
+    111 +    def is_terminal(self) -> bool:
+    112 +        return self.winner() != 0 or self.moves_played >= MAX_MOVES
+    113 +
+    114 +    def terminal_value(self) -> int | None:
+    115 +        winner = self.winner()
+    116 +        if winner != 0:
+    117 +            return 1 if winner == self.to_play else -1
+    118 +        if self.moves_played >= MAX_MOVES:
+    119 +            return 0
+    120 +        return None
+    121 +
+    122 +    def is_winning_move(self, column: int, player: int | None = None) -
+         > bool:
+    123 +        if not self.can_play(column):
+    124 +            return False
+    125 +        player = self.to_play if player is None else player
+    126 +        bit = lowest_empty_bit(self.occupancy, column)
+    127 +        if player == 1:
+    128 +            return has_alignment(self.p1 | bit)
+    129 +        return has_alignment(self.p2 | bit)
+    130 +
+    131 +    def winning_moves(self, player: int | None = None) -> tuple[int, ..
+         .]:
+    132 +        return tuple(column for column in self.ordered_legal_moves() if
+          self.is_winning_move(column, player))
+    133 +
+    134 +    def current_player_bits(self) -> int:
+    135 +        return self.p1 if self.to_play == 1 else self.p2
+    136 +
+    137 +    def opponent_bits(self) -> int:
+    138 +        return self.p2 if self.to_play == 1 else self.p1
+    139 +
+    140 +    def mirrored(self) -> "Connect4State":
+    141 +        return Connect4State(
+    142 +            p1=mirror_bits(self.p1),
+    143 +            p2=mirror_bits(self.p2),
+    144 +            to_play=self.to_play,
+    145 +            moves_played=self.moves_played,
+    146 +        )
+    147 +
+    148 +    def canonical_key(self) -> tuple[int, int, int, int]:
+    149 +        direct = (self.p1, self.p2, self.to_play, self.moves_played)
+    150 +        mirrored = (mirror_bits(self.p1), mirror_bits(self.p2), self.to
+         _play, self.moves_played)
+    151 +        return direct if direct <= mirrored else mirrored
+    152 +
+    153 +    def to_array(self) -> np.ndarray:
+    154 +        board = np.zeros((ROWS, COLUMNS), dtype=np.int8)
+    155 +        for column in range(COLUMNS):
+    156 +            base = column * BITS_PER_COLUMN
+    157 +            for row in range(ROWS):
+    158 +                bit = 1 << (base + row)
+    159 +                if self.p1 & bit:
+    160 +                    board[ROWS - 1 - row, column] = 1
+    161 +                elif self.p2 & bit:
+    162 +                    board[ROWS - 1 - row, column] = -1
+    163 +        return board
+    164 +
+    165 +    def to_planes(self, dtype: np.dtype = np.float32) -> np.ndarray:
+    166 +        planes = np.zeros((3, ROWS, COLUMNS), dtype=dtype)
+    167 +        current_bits = self.current_player_bits()
+    168 +        opponent_bits = self.opponent_bits()
+    169 +        for column in range(COLUMNS):
+    170 +            base = column * BITS_PER_COLUMN
+    171 +            for row in range(ROWS):
+    172 +                bit = 1 << (base + row)
+    173 +                y = ROWS - 1 - row
+    174 +                if current_bits & bit:
+    175 +                    planes[0, y, column] = 1
+    176 +                elif opponent_bits & bit:
+    177 +                    planes[1, y, column] = 1
+    178 +        planes[2, :, :] = 1.0 if self.to_play == 1 else 0.0
+    179 +        return planes
+    180 +
+    181 +    def render(self, human_player: int | None = None) -> str:
+    182 +        board = self.to_array()
+    183 +        rows: list[str] = ["  1   2   3   4   5   6   7"]
+    184 +        border = "+---+---+---+---+---+---+---+"
+    185 +        rows.append(border)
+    186 +        for row in board:
+    187 +            symbols = []
+    188 +            for value in row:
+    189 +                if value == 0:
+    190 +                    symbols.append(" . ")
+    191 +                elif human_player is None:
+    192 +                    symbols.append(" X " if value == 1 else " O ")
+    193 +                else:
+    194 +                    symbols.append(" H " if value == human_player else
+         " A ")
+    195 +            rows.append("|" + "|".join(symbols) + "|")
+    196 +            rows.append(border)
+    197 +        return "\n".join(rows)
+    198 +
+    199 +
+    200 +def moves_from_text(text: str) -> list[int]:
+    201 +    tokens = [token.strip() for token in text.replace(",", " ").split()
+          if token.strip()]
+    202 +    moves: list[int] = []
+    203 +    for token in tokens:
+    204 +        move = int(token)
+    205 +        if not 1 <= move <= COLUMNS:
+    206 +            raise ValueError(f"move must be between 1 and {COLUMNS}")
+    207 +        moves.append(move - 1)
+    208 +    return moves
+
+  └ connect4/src/connect4_az/mcts.py (+143 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import math
+      4 +from dataclasses import dataclass, field
+      5 +
+      6 +import numpy as np
+      7 +import torch
+      8 +
+      9 +from connect4_az.game import Connect4State
+     10 +
+     11 +
+     12 +@dataclass(frozen=True, slots=True)
+     13 +class MCTSConfig:
+     14 +    simulations: int = 800
+     15 +    c_puct: float = 1.5
+     16 +    dirichlet_alpha: float = 0.5
+     17 +    dirichlet_epsilon: float = 0.25
+     18 +
+     19 +
+     20 +@dataclass(slots=True)
+     21 +class SearchNode:
+     22 +    prior: float
+     23 +    visit_count: int = 0
+     24 +    value_sum: float = 0.0
+     25 +    children: dict[int, "SearchNode"] = field(default_factory=dict)
+     26 +
+     27 +    def q_value(self) -> float:
+     28 +        if self.visit_count == 0:
+     29 +            return 0.0
+     30 +        return self.value_sum / self.visit_count
+     31 +
+     32 +
+     33 +def _masked_softmax(logits: np.ndarray, legal_moves: tuple[int, ...]) -
+         > dict[int, float]:
+     34 +    masked = np.full_like(logits, -1e9, dtype=np.float64)
+     35 +    masked[list(legal_moves)] = logits[list(legal_moves)]
+     36 +    masked -= masked.max()
+     37 +    probs = np.exp(masked)
+     38 +    probs_sum = probs.sum()
+     39 +    if probs_sum == 0:
+     40 +        uniform = 1.0 / len(legal_moves)
+     41 +        return {move: uniform for move in legal_moves}
+     42 +    probs /= probs_sum
+     43 +    return {move: float(probs[move]) for move in legal_moves}
+     44 +
+     45 +
+     46 +def _evaluate_state(model: torch.nn.Module, state: Connect4State, devic
+         e: torch.device) -> tuple[dict[int, float], float]:
+     47 +    planes = torch.from_numpy(state.to_planes()).unsqueeze(0).to(device
+         =device, dtype=torch.float32)
+     48 +    with torch.inference_mode():
+     49 +        policy_logits, value = model(planes)
+     50 +    logits = policy_logits.squeeze(0).detach().cpu().numpy()
+     51 +    priors = _masked_softmax(logits, state.ordered_legal_moves())
+     52 +    return priors, float(value.item())
+     53 +
+     54 +
+     55 +def _expand_node(node: SearchNode, priors: dict[int, float]) -> None:
+     56 +    if node.children:
+     57 +        return
+     58 +    for move, prior in priors.items():
+     59 +        node.children[move] = SearchNode(prior=prior)
+     60 +
+     61 +
+     62 +def _add_root_noise(root: SearchNode, legal_moves: tuple[int, ...], con
+         fig: MCTSConfig, rng: np.random.Generator) -> None:
+     63 +    if not legal_moves:
+     64 +        return
+     65 +    noise = rng.dirichlet([config.dirichlet_alpha] * len(legal_moves))
+     66 +    for move, eta in zip(legal_moves, noise, strict=True):
+     67 +        child = root.children[move]
+     68 +        child.prior = child.prior * (1.0 - config.dirichlet_epsilon) +
+         float(eta) * config.dirichlet_epsilon
+     69 +
+     70 +
+     71 +def _select_child(node: SearchNode, config: MCTSConfig) -> tuple[int, S
+         earchNode]:
+     72 +    best_move = -1
+     73 +    best_child: SearchNode | None = None
+     74 +    best_score = -float("inf")
+     75 +    sqrt_visits = math.sqrt(max(1, node.visit_count))
+     76 +    for move, child in node.children.items():
+     77 +        q_score = -child.q_value()
+     78 +        u_score = config.c_puct * child.prior * sqrt_visits / (1 + chil
+         d.visit_count)
+     79 +        score = q_score + u_score
+     80 +        if score > best_score:
+     81 +            best_move = move
+     82 +            best_child = child
+     83 +            best_score = score
+     84 +    if best_child is None:
+     85 +        raise RuntimeError("search node has no children")
+     86 +    return best_move, best_child
+     87 +
+     88 +
+     89 +def run_mcts(
+     90 +    model: torch.nn.Module,
+     91 +    root_state: Connect4State,
+     92 +    device: torch.device,
+     93 +    config: MCTSConfig,
+     94 +    add_noise: bool = False,
+     95 +    rng: np.random.Generator | None = None,
+     96 +) -> tuple[np.ndarray, dict[int, int]]:
+     97 +    rng = rng or np.random.default_rng()
+     98 +    root = SearchNode(prior=1.0)
+     99 +    terminal_value = root_state.terminal_value()
+    100 +    if terminal_value is not None:
+    101 +        visits = np.zeros(7, dtype=np.float32)
+    102 +        return visits, {}
+    103 +    priors, _ = _evaluate_state(model, root_state, device)
+    104 +    _expand_node(root, priors)
+    105 +    if add_noise:
+    106 +        _add_root_noise(root, root_state.ordered_legal_moves(), config,
+          rng)
+    107 +    for _ in range(config.simulations):
+    108 +        node = root
+    109 +        state = root_state
+    110 +        path = [root]
+    111 +        while node.children:
+    112 +            move, node = _select_child(node, config)
+    113 +            state = state.play(move)
+    114 +            path.append(node)
+    115 +            if state.is_terminal():
+    116 +                break
+    117 +        terminal_value = state.terminal_value()
+    118 +        if terminal_value is None:
+    119 +            priors, value = _evaluate_state(model, state, device)
+    120 +            _expand_node(node, priors)
+    121 +        else:
+    122 +            value = float(terminal_value)
+    123 +        for visited in reversed(path):
+    124 +            visited.visit_count += 1
+    125 +            visited.value_sum += value
+    126 +            value = -value
+    127 +    visits = np.zeros(7, dtype=np.float32)
+    128 +    visit_map: dict[int, int] = {}
+    129 +    for move, child in root.children.items():
+    130 +        visits[move] = float(child.visit_count)
+    131 +        visit_map[move] = child.visit_count
+    132 +    if visits.sum() > 0:
+    133 +        visits /= visits.sum()
+    134 +    return visits, visit_map
+    135 +
+    136 +
+    137 +def choose_action(visit_distribution: np.ndarray, legal_moves: tuple[in
+         t, ...], temperature: float = 0.0) -> int:
+    138 +    legal_probs = visit_distribution[list(legal_moves)]
+    139 +    if temperature <= 1e-6:
+    140 +        return legal_moves[int(np.argmax(legal_probs))]
+    141 +    adjusted = np.power(legal_probs + 1e-8, 1.0 / temperature)
+    142 +    adjusted /= adjusted.sum()
+    143 +    return int(np.random.choice(np.array(legal_moves), p=adjusted))
+
+  └ connect4/src/connect4_az/model.py (+69 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +from dataclasses import dataclass
+     4 +
+     5 +import torch
+     6 +from torch import nn
+     7 +
+     8 +from connect4_az.game import COLUMNS
+     9 +
+    10 +
+    11 +class ResidualBlock(nn.Module):
+    12 +    def __init__(self, channels: int) -> None:
+    13 +        super().__init__()
+    14 +        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, paddin
+        g=1, bias=False)
+    15 +        self.bn1 = nn.BatchNorm2d(channels)
+    16 +        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, paddin
+        g=1, bias=False)
+    17 +        self.bn2 = nn.BatchNorm2d(channels)
+    18 +        self.relu = nn.ReLU(inplace=True)
+    19 +
+    20 +    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    21 +        residual = x
+    22 +        x = self.relu(self.bn1(self.conv1(x)))
+    23 +        x = self.bn2(self.conv2(x))
+    24 +        x = x + residual
+    25 +        return self.relu(x)
+    26 +
+    27 +
+    28 +class Connect4Net(nn.Module):
+    29 +    def __init__(self, channels: int = 96, blocks: int = 6, input_planes
+        : int = 3) -> None:
+    30 +        super().__init__()
+    31 +        self.stem = nn.Sequential(
+    32 +            nn.Conv2d(input_planes, channels, kernel_size=3, padding=1,
+        bias=False),
+    33 +            nn.BatchNorm2d(channels),
+    34 +            nn.ReLU(inplace=True),
+    35 +        )
+    36 +        self.backbone = nn.Sequential(*(ResidualBlock(channels) for _ in
+         range(blocks)))
+    37 +        self.policy_head = nn.Sequential(
+    38 +            nn.Conv2d(channels, 32, kernel_size=1, bias=False),
+    39 +            nn.BatchNorm2d(32),
+    40 +            nn.ReLU(inplace=True),
+    41 +            nn.Flatten(),
+    42 +            nn.Linear(32 * 6 * 7, COLUMNS),
+    43 +        )
+    44 +        self.value_head = nn.Sequential(
+    45 +            nn.Conv2d(channels, 8, kernel_size=1, bias=False),
+    46 +            nn.BatchNorm2d(8),
+    47 +            nn.ReLU(inplace=True),
+    48 +            nn.Flatten(),
+    49 +            nn.Linear(8 * 6 * 7, channels),
+    50 +            nn.ReLU(inplace=True),
+    51 +            nn.Linear(channels, 1),
+    52 +            nn.Tanh(),
+    53 +        )
+    54 +
+    55 +    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tens
+        or]:
+    56 +        x = self.stem(x)
+    57 +        x = self.backbone(x)
+    58 +        policy_logits = self.policy_head(x)
+    59 +        value = self.value_head(x).squeeze(-1)
+    60 +        return policy_logits, value
+    61 +
+    62 +
+    63 +@dataclass(frozen=True, slots=True)
+    64 +class ModelConfig:
+    65 +    channels: int = 96
+    66 +    blocks: int = 6
+    67 +
+    68 +    def build(self) -> Connect4Net:
+    69 +        return Connect4Net(channels=self.channels, blocks=self.blocks)
+
+  └ connect4/src/connect4_az/solver.py (+91 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +from dataclasses import dataclass
+     4 +
+     5 +from connect4_az.game import Connect4State
+     6 +
+     7 +
+     8 +@dataclass(frozen=True, slots=True)
+     9 +class SolveResult:
+    10 +    value: int
+    11 +    best_moves: tuple[int, ...]
+    12 +    move_values: dict[int, int]
+    13 +
+    14 +
+    15 +class Connect4Solver:
+    16 +    def __init__(self) -> None:
+    17 +        self._value_cache: dict[tuple[int, int, int, int], int] = {}
+    18 +        self.nodes = 0
+    19 +
+    20 +    def cached_positions(self) -> int:
+    21 +        return len(self._value_cache)
+    22 +
+    23 +    def solve(self, state: Connect4State, full_move_values: bool = False
+        ) -> SolveResult:
+    24 +        terminal_value = state.terminal_value()
+    25 +        legal_moves = state.ordered_legal_moves()
+    26 +        if terminal_value is not None:
+    27 +            return SolveResult(value=terminal_value, best_moves=(), move
+        _values={})
+    28 +        winning_moves = state.winning_moves()
+    29 +        if winning_moves:
+    30 +            move_values = {move: 1 for move in winning_moves}
+    31 +            if full_move_values:
+    32 +                for move in legal_moves:
+    33 +                    move_values.setdefault(move, -self.value(state.play(
+        move)))
+    34 +            return SolveResult(value=1, best_moves=winning_moves, move_v
+        alues=move_values)
+    35 +        forced_reply = self._forced_block_move(state)
+    36 +        if forced_reply == -2:
+    37 +            return SolveResult(value=-1, best_moves=(), move_values={mov
+        e: -1 for move in legal_moves})
+    38 +        candidate_moves = legal_moves if forced_reply is None else (forc
+        ed_reply,)
+    39 +        move_values: dict[int, int] = {}
+    40 +        best_value = -2
+    41 +        for move in candidate_moves:
+    42 +            score = -self.value(state.play(move))
+    43 +            move_values[move] = score
+    44 +            if score > best_value:
+    45 +                best_value = score
+    46 +        if forced_reply is not None:
+    47 +            for move in legal_moves:
+    48 +                move_values.setdefault(move, -1)
+    49 +        best_moves = tuple(move for move in candidate_moves if move_valu
+        es[move] == best_value)
+    50 +        if full_move_values and forced_reply is None:
+    51 +            for move in legal_moves:
+    52 +                move_values.setdefault(move, -self.value(state.play(move
+        )))
+    53 +        return SolveResult(value=best_value, best_moves=best_moves, move
+        _values=move_values)
+    54 +
+    55 +    def value(self, state: Connect4State, alpha: int = -1, beta: int = 1
+        ) -> int:
+    56 +        terminal_value = state.terminal_value()
+    57 +        if terminal_value is not None:
+    58 +            return terminal_value
+    59 +        winning_moves = state.winning_moves()
+    60 +        if winning_moves:
+    61 +            return 1
+    62 +        forced_reply = self._forced_block_move(state)
+    63 +        if forced_reply == -2:
+    64 +            return -1
+    65 +        key = state.canonical_key()
+    66 +        cached = self._value_cache.get(key)
+    67 +        if cached is not None:
+    68 +            return cached
+    69 +        self.nodes += 1
+    70 +        best = -1
+    71 +        alpha_local = alpha
+    72 +        candidate_moves = state.ordered_legal_moves() if forced_reply is
+         None else (forced_reply,)
+    73 +        for move in candidate_moves:
+    74 +            score = -self.value(state.play(move), -beta, -alpha_local)
+    75 +            if score > best:
+    76 +                best = score
+    77 +            if best > alpha_local:
+    78 +                alpha_local = best
+    79 +            if alpha_local >= beta or best == 1:
+    80 +                break
+    81 +        self._value_cache[key] = best
+    82 +        return best
+    83 +
+    84 +    @staticmethod
+    85 +    def _forced_block_move(state: Connect4State) -> int | None:
+    86 +        opponent_wins = state.winning_moves(player=-state.to_play)
+    87 +        if len(opponent_wins) >= 2:
+    88 +            return -2
+    89 +        if len(opponent_wins) == 1:
+    90 +            return opponent_wins[0]
+    91 +        return None
+
+  └ connect4/src/connect4_az/training.py (+504 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import json
+      4 +import math
+      5 +import os
+      6 +import random
+      7 +import time
+      8 +from dataclasses import asdict, dataclass
+      9 +from pathlib import Path
+     10 +
+     11 +import numpy as np
+     12 +import torch
+     13 +from torch import nn
+     14 +from torch.utils.data import DataLoader, TensorDataset
+     15 +from tqdm import tqdm
+     16 +
+     17 +from connect4_az.game import COLUMNS, Connect4State, MAX_MOVES
+     18 +from connect4_az.mcts import MCTSConfig, choose_action, run_mcts
+     19 +from connect4_az.model import Connect4Net, ModelConfig
+     20 +from connect4_az.solver import Connect4Solver
+     21 +
+     22 +
+     23 +@dataclass(frozen=True, slots=True)
+     24 +class TrainConfig:
+     25 +    seed: int = 0
+     26 +    device: str = "cuda"
+     27 +    hours: float = 3.0
+     28 +    batch_size: int = 512
+     29 +    lr: float = 2e-3
+     30 +    weight_decay: float = 1e-4
+     31 +    channels: int = 96
+     32 +    blocks: int = 6
+     33 +    solver_train_positions: int = 30000
+     34 +    solver_val_positions: int = 4000
+     35 +    min_random_depth: int = 8
+     36 +    max_random_depth: int = 28
+     37 +    pretrain_epochs: int = 20
+     38 +    self_play_iterations: int = 12
+     39 +    self_play_games: int = 120
+     40 +    self_play_epochs: int = 4
+     41 +    self_play_batch_size: int = 384
+     42 +    train_mcts_simulations: int = 256
+     43 +    eval_mcts_simulations: int = 512
+     44 +    play_mcts_simulations: int = 1600
+     45 +    final_eval_positions: int = 1000
+     46 +
+     47 +
+     48 +def set_seed(seed: int) -> None:
+     49 +    random.seed(seed)
+     50 +    np.random.seed(seed)
+     51 +    torch.manual_seed(seed)
+     52 +    if torch.cuda.is_available():
+     53 +        torch.cuda.manual_seed_all(seed)
+     54 +
+     55 +
+     56 +def resolve_device(device_name: str) -> torch.device:
+     57 +    if device_name == "cuda" and not torch.cuda.is_available():
+     58 +        return torch.device("cpu")
+     59 +    return torch.device(device_name)
+     60 +
+     61 +
+     62 +def build_model(config: TrainConfig, device: torch.device) -> Connect4N
+         et:
+     63 +    model = ModelConfig(channels=config.channels, blocks=config.blocks)
+         .build().to(device)
+     64 +    return model
+     65 +
+     66 +
+     67 +def _uniform_policy(best_moves: tuple[int, ...]) -> np.ndarray:
+     68 +    policy = np.zeros(COLUMNS, dtype=np.float32)
+     69 +    if not best_moves:
+     70 +        return policy
+     71 +    weight = 1.0 / len(best_moves)
+     72 +    for move in best_moves:
+     73 +        policy[move] = weight
+     74 +    return policy
+     75 +
+     76 +
+     77 +def _sample_random_state(rng: np.random.Generator, min_depth: int, max_
+         depth: int) -> Connect4State:
+     78 +    target_depth = int(rng.integers(min_depth, max_depth + 1))
+     79 +    state = Connect4State()
+     80 +    for _ in range(target_depth):
+     81 +        legal_moves = state.legal_moves()
+     82 +        if not legal_moves:
+     83 +            break
+     84 +        if rng.random() < 0.2:
+     85 +            move = legal_moves[int(rng.integers(0, len(legal_moves)))]
+     86 +        else:
+     87 +            move = state.ordered_legal_moves()[int(rng.integers(0, len(
+         legal_moves)))]
+     88 +        state = state.play(move)
+     89 +        if state.is_terminal():
+     90 +            break
+     91 +    if state.is_terminal() and state.moves_played < MAX_MOVES:
+     92 +        return _sample_random_state(rng, min_depth, max_depth)
+     93 +    return state
+     94 +
+     95 +
+     96 +def generate_solver_dataset(
+     97 +    train_config: TrainConfig,
+     98 +    total_positions: int,
+     99 +    split_name: str,
+    100 +    run_dir: Path,
+    101 +    include_mirrors: bool = True,
+    102 +) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, float]]:
+    103 +    rng = np.random.default_rng(train_config.seed + (17 if split_name =
+         = "train" else 23))
+    104 +    solver = Connect4Solver()
+    105 +    states: list[np.ndarray] = []
+    106 +    policies: list[np.ndarray] = []
+    107 +    values: list[float] = []
+    108 +    progress = tqdm(total=total_positions, desc=f"solver-{split_name}",
+          leave=False)
+    109 +    while len(values) < total_positions:
+    110 +        state = _sample_random_state(rng, train_config.min_random_depth
+         , train_config.max_random_depth)
+    111 +        result = solver.solve(state)
+    112 +        states.append(state.to_planes())
+    113 +        policies.append(_uniform_policy(result.best_moves))
+    114 +        values.append(float(result.value))
+    115 +        if include_mirrors:
+    116 +            mirrored_state = state.mirrored()
+    117 +            mirrored_policy = _uniform_policy(tuple(COLUMNS - 1 - move
+         for move in result.best_moves))
+    118 +            states.append(mirrored_state.to_planes())
+    119 +            policies.append(mirrored_policy)
+    120 +            values.append(float(result.value))
+    121 +        progress.update(1)
+    122 +    progress.close()
+    123 +    states_array = np.stack(states[:total_positions]).astype(np.float32
+         )
+    124 +    policies_array = np.stack(policies[:total_positions]).astype(np.flo
+         at32)
+    125 +    values_array = np.asarray(values[:total_positions], dtype=np.float3
+         2)
+    126 +    metrics = {
+    127 +        "split": split_name,
+    128 +        "positions": int(total_positions),
+    129 +        "solver_nodes": int(solver.nodes),
+    130 +        "solver_cache": int(solver.cached_positions()),
+    131 +    }
+    132 +    np.savez_compressed(
+    133 +        run_dir / f"solver_{split_name}.npz",
+    134 +        states=states_array,
+    135 +        policies=policies_array,
+    136 +        values=values_array,
+    137 +    )
+    138 +    return states_array, policies_array, values_array, metrics
+    139 +
+    140 +
+    141 +def _policy_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.
+         Tensor:
+    142 +    return -(targets * torch.log_softmax(logits, dim=1)).sum(dim=1).mea
+         n()
+    143 +
+    144 +
+    145 +def _evaluate_supervised(
+    146 +    model: Connect4Net,
+    147 +    loader: DataLoader,
+    148 +    device: torch.device,
+    149 +) -> dict[str, float]:
+    150 +    model.eval()
+    151 +    total_loss = 0.0
+    152 +    total_policy = 0.0
+    153 +    total_value = 0.0
+    154 +    total_examples = 0
+    155 +    policy_hit = 0
+    156 +    value_sign = 0
+    157 +    with torch.inference_mode():
+    158 +        for states, policies, values in loader:
+    159 +            states = states.to(device)
+    160 +            policies = policies.to(device)
+    161 +            values = values.to(device)
+    162 +            logits, value_pred = model(states)
+    163 +            policy_loss = _policy_loss(logits, policies)
+    164 +            value_loss = torch.mean((value_pred - values) ** 2)
+    165 +            batch_loss = policy_loss + value_loss
+    166 +            total_loss += float(batch_loss.item()) * states.size(0)
+    167 +            total_policy += float(policy_loss.item()) * states.size(0)
+    168 +            total_value += float(value_loss.item()) * states.size(0)
+    169 +            total_examples += states.size(0)
+    170 +            best_pred = torch.argmax(logits, dim=1)
+    171 +            best_target = torch.argmax(policies, dim=1)
+    172 +            policy_hit += int((best_pred == best_target).sum().item())
+    173 +            value_sign += int((torch.sign(value_pred) == torch.sign(val
+         ues)).sum().item())
+    174 +    return {
+    175 +        "loss": total_loss / total_examples,
+    176 +        "policy_loss": total_policy / total_examples,
+    177 +        "value_loss": total_value / total_examples,
+    178 +        "policy_top1": policy_hit / total_examples,
+    179 +        "value_sign": value_sign / total_examples,
+    180 +    }
+    181 +
+    182 +
+    183 +def supervised_pretrain(
+    184 +    train_config: TrainConfig,
+    185 +    model: Connect4Net,
+    186 +    device: torch.device,
+    187 +    train_arrays: tuple[np.ndarray, np.ndarray, np.ndarray],
+    188 +    val_arrays: tuple[np.ndarray, np.ndarray, np.ndarray],
+    189 +    run_dir: Path,
+    190 +    log_path: Path,
+    191 +) -> dict[str, float]:
+    192 +    train_states, train_policies, train_values = train_arrays
+    193 +    val_states, val_policies, val_values = val_arrays
+    194 +    train_dataset = TensorDataset(
+    195 +        torch.from_numpy(train_states),
+    196 +        torch.from_numpy(train_policies),
+    197 +        torch.from_numpy(train_values),
+    198 +    )
+    199 +    val_dataset = TensorDataset(
+    200 +        torch.from_numpy(val_states),
+    201 +        torch.from_numpy(val_policies),
+    202 +        torch.from_numpy(val_values),
+    203 +    )
+    204 +    train_loader = DataLoader(train_dataset, batch_size=train_config.ba
+         tch_size, shuffle=True, num_workers=0)
+    205 +    val_loader = DataLoader(val_dataset, batch_size=train_config.batch_
+         size, shuffle=False, num_workers=0)
+    206 +    optimizer = torch.optim.AdamW(model.parameters(), lr=train_config.l
+         r, weight_decay=train_config.weight_decay)
+    207 +    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T
+         _max=train_config.pretrain_epochs)
+    208 +    best_metric = -1.0
+    209 +    best_val = {}
+    210 +    for epoch in range(train_config.pretrain_epochs):
+    211 +        model.train()
+    212 +        epoch_loss = 0.0
+    213 +        total_examples = 0
+    214 +        start = time.time()
+    215 +        for states, policies, values in train_loader:
+    216 +            states = states.to(device)
+    217 +            policies = policies.to(device)
+    218 +            values = values.to(device)
+    219 +            optimizer.zero_grad(set_to_none=True)
+    220 +            logits, value_pred = model(states)
+    221 +            policy_loss = _policy_loss(logits, policies)
+    222 +            value_loss = torch.mean((value_pred - values) ** 2)
+    223 +            loss = policy_loss + value_loss
+    224 +            loss.backward()
+    225 +            optimizer.step()
+    226 +            epoch_loss += float(loss.item()) * states.size(0)
+    227 +            total_examples += states.size(0)
+    228 +        scheduler.step()
+    229 +        metrics = _evaluate_supervised(model, val_loader, device)
+    230 +        record = {
+    231 +            "phase": "pretrain",
+    232 +            "epoch": epoch + 1,
+    233 +            "train_loss": epoch_loss / total_examples,
+    234 +            "lr": optimizer.param_groups[0]["lr"],
+    235 +            "seconds": time.time() - start,
+    236 +            **metrics,
+    237 +        }
+    238 +        append_jsonl(log_path, record)
+    239 +        if metrics["policy_top1"] + metrics["value_sign"] > best_metric
+         :
+    240 +            best_metric = metrics["policy_top1"] + metrics["value_sign"
+         ]
+    241 +            best_val = record
+    242 +            save_checkpoint(run_dir / "best.pt", model, train_config, e
+         xtra={"phase": "pretrain", **record})
+    243 +        save_checkpoint(run_dir / "latest.pt", model, train_config, ext
+         ra={"phase": "pretrain", **record})
+    244 +    return best_val
+    245 +
+    246 +
+    247 +def _self_play_game(
+    248 +    model: Connect4Net,
+    249 +    device: torch.device,
+    250 +    mcts_config: MCTSConfig,
+    251 +    move_temperature_cutoff: int,
+    252 +) -> list[tuple[np.ndarray, np.ndarray, float]]:
+    253 +    examples: list[tuple[np.ndarray, np.ndarray, float]] = []
+    254 +    state = Connect4State()
+    255 +    move_index = 0
+    256 +    while not state.is_terminal():
+    257 +        visit_distribution, _ = run_mcts(
+    258 +            model=model,
+    259 +            root_state=state,
+    260 +            device=device,
+    261 +            config=mcts_config,
+    262 +            add_noise=True,
+    263 +        )
+    264 +        temperature = 1.0 if move_index < move_temperature_cutoff else
+         0.0
+    265 +        move = choose_action(visit_distribution, state.legal_moves(), t
+         emperature=temperature)
+    266 +        examples.append((state.to_planes(), visit_distribution.astype(n
+         p.float32), float(state.to_play)))
+    267 +        state = state.play(move)
+    268 +        move_index += 1
+    269 +    winner = state.winner()
+    270 +    finished: list[tuple[np.ndarray, np.ndarray, float]] = []
+    271 +    for planes, policy, player in examples:
+    272 +        outcome = 0.0 if winner == 0 else (1.0 if winner == int(player)
+          else -1.0)
+    273 +        finished.append((planes, policy, outcome))
+    274 +    return finished
+    275 +
+    276 +
+    277 +def self_play_finetune(
+    278 +    train_config: TrainConfig,
+    279 +    model: Connect4Net,
+    280 +    device: torch.device,
+    281 +    run_dir: Path,
+    282 +    log_path: Path,
+    283 +) -> None:
+    284 +    optimizer = torch.optim.AdamW(model.parameters(), lr=train_config.l
+         r * 0.3, weight_decay=train_config.weight_decay)
+    285 +    mcts_config = MCTSConfig(simulations=train_config.train_mcts_simula
+         tions)
+    286 +    for iteration in range(train_config.self_play_iterations):
+    287 +        start = time.time()
+    288 +        replay: list[tuple[np.ndarray, np.ndarray, float]] = []
+    289 +        for _ in tqdm(range(train_config.self_play_games), desc=f"selfp
+         lay-{iteration+1}", leave=False):
+    290 +            replay.extend(_self_play_game(model, device, mcts_config, m
+         ove_temperature_cutoff=10))
+    291 +        states = torch.from_numpy(np.stack([entry[0] for entry in repla
+         y]).astype(np.float32))
+    292 +        policies = torch.from_numpy(np.stack([entry[1] for entry in rep
+         lay]).astype(np.float32))
+    293 +        values = torch.from_numpy(np.asarray([entry[2] for entry in rep
+         lay], dtype=np.float32))
+    294 +        dataset = TensorDataset(states, policies, values)
+    295 +        loader = DataLoader(dataset, batch_size=train_config.self_play_
+         batch_size, shuffle=True, num_workers=0)
+    296 +        model.train()
+    297 +        total_loss = 0.0
+    298 +        total_examples = 0
+    299 +        for _ in range(train_config.self_play_epochs):
+    300 +            for batch_states, batch_policies, batch_values in loader:
+    301 +                batch_states = batch_states.to(device)
+    302 +                batch_policies = batch_policies.to(device)
+    303 +                batch_values = batch_values.to(device)
+    304 +                optimizer.zero_grad(set_to_none=True)
+    305 +                logits, value_pred = model(batch_states)
+    306 +                policy_loss = _policy_loss(logits, batch_policies)
+    307 +                value_loss = torch.mean((value_pred - batch_values) **
+         2)
+    308 +                loss = policy_loss + value_loss
+    309 +                loss.backward()
+    310 +                optimizer.step()
+    311 +                total_loss += float(loss.item()) * batch_states.size(0)
+    312 +                total_examples += batch_states.size(0)
+    313 +        eval_metrics = evaluate_mcts_against_solver(
+    314 +            model=model,
+    315 +            device=device,
+    316 +            positions=train_config.final_eval_positions // 2,
+    317 +            simulations=train_config.eval_mcts_simulations,
+    318 +            seed=train_config.seed + 101 + iteration,
+    319 +            min_depth=train_config.min_random_depth,
+    320 +            max_depth=train_config.max_random_depth,
+    321 +        )
+    322 +        record = {
+    323 +            "phase": "self_play",
+    324 +            "iteration": iteration + 1,
+    325 +            "examples": len(replay),
+    326 +            "train_loss": total_loss / max(1, total_examples),
+    327 +            "seconds": time.time() - start,
+    328 +            **eval_metrics,
+    329 +        }
+    330 +        append_jsonl(log_path, record)
+    331 +        save_checkpoint(run_dir / "latest.pt", model, train_config, ext
+         ra=record)
+    332 +        best_path = run_dir / "best.pt"
+    333 +        best_metric = record["mcts_optimal_move_rate"] + record["value_
+         sign_rate"]
+    334 +        best_so_far = load_checkpoint_metric(best_path)
+    335 +        if best_metric >= best_so_far:
+    336 +            save_checkpoint(best_path, model, train_config, extra=recor
+         d)
+    337 +
+    338 +
+    339 +def evaluate_mcts_against_solver(
+    340 +    model: Connect4Net,
+    341 +    device: torch.device,
+    342 +    positions: int,
+    343 +    simulations: int,
+    344 +    seed: int,
+    345 +    min_depth: int,
+    346 +    max_depth: int,
+    347 +) -> dict[str, float]:
+    348 +    rng = np.random.default_rng(seed)
+    349 +    solver = Connect4Solver()
+    350 +    mcts_config = MCTSConfig(simulations=simulations, dirichlet_epsilon
+         =0.0)
+    351 +    optimal_hits = 0
+    352 +    policy_hits = 0
+    353 +    value_sign_hits = 0
+    354 +    total = 0
+    355 +    tactical_hits = 0
+    356 +    tactical_total = 0
+    357 +    model.eval()
+    358 +    for _ in tqdm(range(positions), desc="eval", leave=False):
+    359 +        state = _sample_random_state(rng, min_depth, max_depth)
+    360 +        result = solver.solve(state)
+    361 +        visit_distribution, _ = run_mcts(model, state, device, mcts_con
+         fig, add_noise=False)
+    362 +        mcts_move = int(np.argmax(visit_distribution))
+    363 +        if mcts_move in result.best_moves:
+    364 +            optimal_hits += 1
+    365 +        planes = torch.from_numpy(state.to_planes()).unsqueeze(0).to(de
+         vice=device, dtype=torch.float32)
+    366 +        with torch.inference_mode():
+    367 +            logits, value = model(planes)
+    368 +        policy_move = int(torch.argmax(logits, dim=1).item())
+    369 +        if policy_move in result.best_moves:
+    370 +            policy_hits += 1
+    371 +        if int(np.sign(float(value.item()))) == result.value:
+    372 +            value_sign_hits += 1
+    373 +        if state.winning_moves() or state.winning_moves(player=-state.t
+         o_play):
+    374 +            tactical_total += 1
+    375 +            if mcts_move in result.best_moves:
+    376 +                tactical_hits += 1
+    377 +        total += 1
+    378 +    return {
+    379 +        "positions": total,
+    380 +        "policy_optimal_move_rate": policy_hits / total,
+    381 +        "mcts_optimal_move_rate": optimal_hits / total,
+    382 +        "value_sign_rate": value_sign_hits / total,
+    383 +        "tactical_optimal_move_rate": tactical_hits / max(1, tactical_t
+         otal),
+    384 +        "solver_nodes": solver.nodes,
+    385 +        "solver_cache": solver.cached_positions(),
+    386 +        "simulations": simulations,
+    387 +    }
+    388 +
+    389 +
+    390 +def save_checkpoint(path: Path, model: Connect4Net, train_config: Train
+         Config, extra: dict[str, float] | None = None) -> None:
+    391 +    payload = {
+    392 +        "state_dict": model.state_dict(),
+    393 +        "config": asdict(train_config),
+    394 +        "extra": extra or {},
+    395 +    }
+    396 +    torch.save(payload, path)
+    397 +
+    398 +
+    399 +def load_model_from_checkpoint(path: Path, device: torch.device) -> tup
+         le[Connect4Net, dict]:
+    400 +    payload = torch.load(path, map_location=device)
+    401 +    config = TrainConfig(**payload["config"])
+    402 +    model = build_model(config, device)
+    403 +    model.load_state_dict(payload["state_dict"])
+    404 +    model.eval()
+    405 +    return model, payload.get("extra", {})
+    406 +
+    407 +
+    408 +def load_checkpoint_metric(path: Path) -> float:
+    409 +    if not path.exists():
+    410 +        return -float("inf")
+    411 +    payload = torch.load(path, map_location="cpu")
+    412 +    extra = payload.get("extra", {})
+    413 +    return float(extra.get("mcts_optimal_move_rate", 0.0) + extra.get("
+         value_sign_rate", 0.0))
+    414 +
+    415 +
+    416 +def append_jsonl(path: Path, record: dict) -> None:
+    417 +    path.parent.mkdir(parents=True, exist_ok=True)
+    418 +    with path.open("a", encoding="utf-8") as handle:
+    419 +        handle.write(json.dumps(record, sort_keys=True) + "\n")
+    420 +
+    421 +
+    422 +def write_status(path: Path, record: dict) -> None:
+    423 +    path.parent.mkdir(parents=True, exist_ok=True)
+    424 +    with path.open("w", encoding="utf-8") as handle:
+    425 +        json.dump(record, handle, indent=2, sort_keys=True)
+    426 +
+    427 +
+    428 +def train(run_dir: Path, train_config: TrainConfig) -> dict[str, float]
+         :
+    429 +    start = time.time()
+    430 +    run_dir.mkdir(parents=True, exist_ok=True)
+    431 +    logs_dir = run_dir / "logs"
+    432 +    train_log = logs_dir / "train.jsonl"
+    433 +    eval_log = logs_dir / "eval.jsonl"
+    434 +    status_path = logs_dir / "status.json"
+    435 +    set_seed(train_config.seed)
+    436 +    device = resolve_device(train_config.device)
+    437 +    model = build_model(train_config, device)
+    438 +    write_status(
+    439 +        status_path,
+    440 +        {
+    441 +            "phase": "init",
+    442 +            "device": str(device),
+    443 +            "cuda_available": torch.cuda.is_available(),
+    444 +            "start_time": time.time(),
+    445 +            "pid": os.getpid(),
+    446 +            "config": asdict(train_config),
+    447 +        },
+    448 +    )
+    449 +    train_arrays, _, _, train_solver_metrics = generate_solver_dataset(
+    450 +        train_config=train_config,
+    451 +        total_positions=train_config.solver_train_positions,
+    452 +        split_name="train",
+    453 +        run_dir=run_dir,
+    454 +    )
+    455 +    val_arrays, _, _, val_solver_metrics = generate_solver_dataset(
+    456 +        train_config=train_config,
+    457 +        total_positions=train_config.solver_val_positions,
+    458 +        split_name="val",
+    459 +        run_dir=run_dir,
+    460 +        include_mirrors=False,
+    461 +    )
+    462 +    append_jsonl(train_log, {"phase": "dataset", **train_solver_metrics
+         })
+    463 +    append_jsonl(train_log, {"phase": "dataset", **val_solver_metrics})
+    464 +    write_status(status_path, {"phase": "pretrain", "elapsed": time.tim
+         e() - start, "device": str(device)})
+    465 +    best_pretrain = supervised_pretrain(
+    466 +        train_config=train_config,
+    467 +        model=model,
+    468 +        device=device,
+    469 +        train_arrays=train_arrays,
+    470 +        val_arrays=val_arrays,
+    471 +        run_dir=run_dir,
+    472 +        log_path=train_log,
+    473 +    )
+    474 +    if (run_dir / "best.pt").exists():
+    475 +        model, _ = load_model_from_checkpoint(run_dir / "best.pt", devi
+         ce)
+    476 +    write_status(status_path, {"phase": "self_play", "elapsed": time.ti
+         me() - start, "device": str(device)})
+    477 +    self_play_finetune(
+    478 +        train_config=train_config,
+    479 +        model=model,
+    480 +        device=device,
+    481 +        run_dir=run_dir,
+    482 +        log_path=train_log,
+    483 +    )
+    484 +    best_checkpoint = run_dir / "best.pt"
+    485 +    if best_checkpoint.exists():
+    486 +        model, _ = load_model_from_checkpoint(best_checkpoint, device)
+    487 +    final_eval = evaluate_mcts_against_solver(
+    488 +        model=model,
+    489 +        device=device,
+    490 +        positions=train_config.final_eval_positions,
+    491 +        simulations=train_config.play_mcts_simulations,
+    492 +        seed=train_config.seed + 909,
+    493 +        min_depth=train_config.min_random_depth,
+    494 +        max_depth=train_config.max_random_depth,
+    495 +    )
+    496 +    final_record = {
+    497 +        "phase": "final_eval",
+    498 +        "elapsed": time.time() - start,
+    499 +        **final_eval,
+    500 +    }
+    501 +    append_jsonl(eval_log, final_record)
+    502 +    save_checkpoint(run_dir / "best.pt", model, train_config, extra={**
+         best_pretrain, **final_record})
+    503 +    write_status(status_path, {"phase": "done", "elapsed": time.time()
+         - start, **final_record})
+    504 +    return final_record
+
+  └ connect4/tests/test_game.py (+48 -0)
+     1 +from connect4_az.game import Connect4State, has_alignment, mirror_bits,
+        moves_from_text
+     2 +
+     3 +
+     4 +def test_vertical_win_detection() -> None:
+     5 +    state = Connect4State.from_moves([0, 1, 0, 1, 0, 1, 0])
+     6 +    assert state.winner() == 1
+     7 +    assert state.is_terminal()
+     8 +
+     9 +
+    10 +def test_horizontal_win_detection() -> None:
+    11 +    state = Connect4State.from_moves([0, 0, 1, 1, 2, 2, 3])
+    12 +    assert state.winner() == 1
+    13 +    assert state.is_terminal()
+    14 +
+    15 +
+    16 +def test_diagonal_win_detection() -> None:
+    17 +    state = Connect4State.from_moves([0, 1, 1, 2, 2, 5, 2, 3, 3, 6, 3, 3
+        ])
+    18 +    assert state.winner() == 1
+    19 +
+    20 +
+    21 +def test_mirror_round_trip() -> None:
+    22 +    state = Connect4State.from_moves([3, 2, 4, 2, 5, 1, 0, 6])
+    23 +    mirrored = state.mirrored()
+    24 +    assert mirrored.mirrored() == state
+    25 +    assert mirror_bits(state.p1) == mirrored.p1
+    26 +    assert mirror_bits(state.p2) == mirrored.p2
+    27 +
+    28 +
+    29 +def test_planes_shape_and_turn_plane() -> None:
+    30 +    state = Connect4State.from_moves([3, 2, 3])
+    31 +    planes = state.to_planes()
+    32 +    assert planes.shape == (3, 6, 7)
+    33 +    assert planes[2, 0, 0] == 0.0
+    34 +
+    35 +
+    36 +def test_winning_move_detection() -> None:
+    37 +    state = Connect4State.from_moves([0, 4, 1, 4, 2, 4])
+    38 +    assert state.to_play == 1
+    39 +    assert state.is_winning_move(3)
+    40 +
+    41 +
+    42 +def test_moves_from_text() -> None:
+    43 +    assert moves_from_text("1 4 7") == [0, 3, 6]
+    44 +
+    45 +
+    46 +def test_alignment_helper() -> None:
+    47 +    state = Connect4State.from_moves([0, 1, 0, 1, 0, 1, 0])
+    48 +    assert has_alignment(state.p1)
+
+  └ connect4/tests/test_mcts.py (+28 -0)
+     1 +import numpy as np
+     2 +import torch
+     3 +
+     4 +from connect4_az.game import Connect4State
+     5 +from connect4_az.mcts import MCTSConfig, run_mcts
+     6 +
+     7 +
+     8 +class StubModel(torch.nn.Module):
+     9 +    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tens
+        or]:
+    10 +        batch = x.shape[0]
+    11 +        logits = torch.zeros((batch, 7), dtype=torch.float32, device=x.d
+        evice)
+    12 +        logits[:, 3] = 4.0
+    13 +        value = torch.zeros(batch, dtype=torch.float32, device=x.device)
+    14 +        return logits, value
+    15 +
+    16 +
+    17 +def test_mcts_prefers_immediate_win() -> None:
+    18 +    state = Connect4State.from_moves([0, 4, 1, 4, 2, 4])
+    19 +    model = StubModel()
+    20 +    distribution, visits = run_mcts(
+    21 +        model=model,
+    22 +        root_state=state,
+    23 +        device=torch.device("cpu"),
+    24 +        config=MCTSConfig(simulations=64, dirichlet_epsilon=0.0),
+    25 +        add_noise=False,
+    26 +    )
+    27 +    assert int(np.argmax(distribution)) == 3
+    28 +    assert visits[3] == max(visits.values())
+
+  └ connect4/tests/test_solver.py (+26 -0)
+     1 +from connect4_az.game import Connect4State
+     2 +from connect4_az.solver import Connect4Solver
+     3 +
+     4 +
+     5 +def test_solver_finds_immediate_win() -> None:
+     6 +    state = Connect4State.from_moves([0, 4, 1, 4, 2, 4])
+     7 +    solver = Connect4Solver()
+     8 +    result = solver.solve(state)
+     9 +    assert result.value == 1
+    10 +    assert result.best_moves == (3,)
+    11 +
+    12 +
+    13 +def test_solver_blocks_single_threat() -> None:
+    14 +    state = Connect4State.from_moves([0, 3, 0, 3, 1, 3])
+    15 +    solver = Connect4Solver()
+    16 +    result = solver.solve(state)
+    17 +    assert 3 in state.winning_moves(player=-state.to_play)
+    18 +    assert result.best_moves == (3,)
+    19 +
+    20 +
+    21 +def test_solver_detects_terminal_loss() -> None:
+    22 +    state = Connect4State.from_moves([0, 1, 0, 1, 0, 1, 0])
+    23 +    solver = Connect4Solver()
+    24 +    result = solver.solve(state)
+    25 +    assert result.value == -1
+    26 +    assert result.best_moves == ()
+
+─ Worked for 3m 40s ────────────────────────────────────────────────────────────
+
+• The first pass of the code is in place. I’m moving into the tighten-and-fix
+  cycle now: install the package, run the tests, and fix anything structural
+  before I start any training.
+
+• Waited for background terminal
+
+• Explored
+  └ Read training.py
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I found a few structural issues before the first test run: dataset unpacking
+  in the training entrypoint, a couple of evaluation metrics that should respect
+  multiple optimal moves, and some monitor polish. I’m correcting those before I
+  run pytest and the smoke training pass.
+
+• Edited 2 files (+12 -7)
+  └ connect4/src/connect4_az/__main__.py (+3 -0)
+    1 +from connect4_az.cli import main
+    2 +
+    3 +raise SystemExit(main())
+
+  └ connect4/src/connect4_az/training.py (+9 -7)
+      3  import json
+      4 -import math
+      4  import os
+        ⋮
+     11  import torch
+     13 -from torch import nn
+     12  from torch.utils.data import DataLoader, TensorDataset
+        ⋮
+    168              best_pred = torch.argmax(logits, dim=1)
+    171 -            best_target = torch.argmax(policies, dim=1)
+    172 -            policy_hit += int((best_pred == best_target).sum().item())
+    169 +            optimal_mask = policies > 0
+    170 +            policy_hit += int(optimal_mask[torch.arange(states.size(0),
+          device=device), best_pred].sum().item())
+    171              value_sign += int((torch.sign(value_pred) == torch.sign(val
+         ues)).sum().item())
+        ⋮
+    365              logits, value = model(planes)
+    368 -        policy_move = int(torch.argmax(logits, dim=1).item())
+    366 +        legal_moves = state.legal_moves()
+    367 +        legal_logits = logits[0, list(legal_moves)]
+    368 +        policy_move = legal_moves[int(torch.argmax(legal_logits).item()
+         )]
+    369          if policy_move in result.best_moves:
+        ⋮
+    448      )
+    449 -    train_arrays, _, _, train_solver_metrics = generate_solver_dataset(
+    449 +    train_states, train_policies, train_values, train_solver_metrics =
+         generate_solver_dataset(
+    450          train_config=train_config,
+        ⋮
+    454      )
+    455 -    val_arrays, _, _, val_solver_metrics = generate_solver_dataset(
+    455 +    val_states, val_policies, val_values, val_solver_metrics = generate
+         _solver_dataset(
+    456          train_config=train_config,
+        ⋮
+    461      )
+    462 +    train_arrays = (train_states, train_policies, train_values)
+    463 +    val_arrays = (val_states, val_policies, val_values)
+    464      append_jsonl(train_log, {"phase": "dataset", **train_solver_metrics
+         })
+
+• Edited connect4/src/connect4_az/cli.py (+18 -0)
+      5  import os
+      6 +import subprocess
+      7  import sys
+        ⋮
+    140          print()
+    141 +        try:
+    142 +            result = subprocess.run(
+    143 +                [
+    144 +                    "nvidia-smi",
+    145 +                    "--query-gpu=name,utilization.gpu,memory.used,memor
+         y.total,temperature.gpu",
+    146 +                    "--format=csv,noheader,nounits",
+    147 +                ],
+    148 +                check=False,
+    149 +                capture_output=True,
+    150 +                text=True,
+    151 +            )
+    152 +            if result.stdout.strip():
+    153 +                print("GPU:")
+    154 +                print(result.stdout.strip())
+    155 +                print()
+    156 +        except FileNotFoundError:
+    157 +            pass
+    158          if status_path.exists():
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m installing the package into the venv and running the first full test pass
+  now. That will shake out engine, solver, and MCTS issues before I trust any
+  training.
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ import torch
+  │ print('torch', torch.__version__)
+  │ … +5 lines
+  └ torch 2.12.0.dev20260325+cu128
+    cuda_available True
+    cuda_version 12.8
+    device0 NVIDIA GeForce RTX 5060 Ti
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pip install -e .
+  └   Installing build dependencies: finished with status 'done'
+      Checking if build backend supports build_editable: started
+    … +47 lines
+    Installing collected packages: connect4-az
+    Successfully installed connect4-az-0.1.0
+
+• Ran python3 - <<'PY'
+  │ from pathlib import Path
+  │ for path in sorted(Path('/home/johnk/Documents/connect4/src/
+  │ … +3 lines
+  └ __init__.py
+    __main__.py
+    … +4 lines
+    solver.py
+    training.py
+
+────────────────────────────────────────────────────────────────────────────────
+
+• One test failed; I’m pulling the traceback and fixing it before moving on to a
+  smoke training run.
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pytest -x -vv
+  └ collected 12 items
+
+    … +25 lines
+    ========================= 1 failed, 2 passed in 0.58s
+    ==========================
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ from connect4_az.game import Connect4State
+  │ candidates = [
+  │ … +10 lines
+  └ [0, 1, 1, 2, 2, 3, 2, 3, 3, 4, 3] winner 1
+      1   2   3   4   5   6   7
+    … +44 lines
+    +---+---+---+---+---+---+---+
+
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ from connect4_az.game import Connect4State
+  │ seq = [0, 1, 1, 2, 2, 5, 2, 3, 3, 6, 3, 3]
+  │ … +6 lines
+  └   1   2   3   4   5   6   7
+    +---+---+---+---+---+---+---+
+    … +13 lines
+    p1 0b110000011000000100000001
+    p2 0b1000000100000000001001000000100000010000000
+
+• Edited connect4/tests/test_game.py (+1 -1)
+    16  def test_diagonal_win_detection() -> None:
+    17 -    state = Connect4State.from_moves([0, 1, 1, 2, 2, 5, 2, 3, 3, 6, 3, 3
+        ])
+    17 +    state = Connect4State.from_moves([0, 1, 1, 2, 2, 3, 2, 3, 3, 4, 3])
+    18      assert state.winner() == 1
+
+• Waited for background terminal · /home/johnk/Documents/connect4/.venv/bin/
+pytest -q
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pytest -q
+  └ ..F.........
+    [100%]
+    … +15 lines
+    FAILED tests/test_game.py::test_diagonal_win_detection - assert 0 == 1
+    1 failed, 11 passed in 83.87s (0:01:23)
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ from connect4_az.game import Connect4State
+  │ state = Connect4State.from_moves([0,3,0,3,1,3])
+  │ … +5 lines
+  └   1   2   3   4   5   6   7
+    +---+---+---+---+---+---+---+
+    … +13 lines
+    opp winning (3,)
+    current winning ()
+
+• Waited for background terminal · /home/johnk/Documents/connect4/.venv/bin/
+pytest -q
+
+─ Worked for 1m 42s ────────────────────────────────────────────────────────────
+
+• The engine and MCTS are fine, but the first solver recursion is too slow on
+  early tactical states. I’m checking whether a faster exact oracle is available
+  locally or via a packaged implementation; if not, I’ll replace the current
+  solver with a stronger bitboard search rather than pretend this one is good
+  enough for the training target.
+
+• Searched PyPI Connect 4 solver package alpha beta bitboard python
+
+────────────────────────────────────────────────────────────────────────────────
+
+• A packaged perfect oracle exists on PyPI, which is preferable to burning time
+  polishing a Python solver that is clearly too slow for the dataset volume we
+  need. I’m installing it and, if the API is usable, I’ll wrap it behind the
+  local solver interface so training/eval stay exact and the final player still
+  uses only the neural net plus MCTS.
+
+• Ran ps -fp $(pgrep -f '/home/johnk/Documents/connect4/.venv/bin/pytest -q' |
+  │ tr '\n' ' ') || true
+  └ UID          PID    PPID  C STIME TTY      STAT   TIME CMD
+    johnk      96132   95115 99 12:48 ?        Rsl    1:14 /home/johnk/
+    … +3 lines
+    $(pgrep -f '/home/johnk/Documents/connect4/.venv/bin/pytest -q' | tr '\n' '
+    ') || true
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pip install connect-four-ai
+  └ ERROR: Could not find a version that satisfies the requirement
+    connect-four-ai (from versions: none)
+    ERROR: No matching distribution found for connect-four-ai
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pip index versions
+  │ connect-four-ai
+  └ ERROR: No matching distribution found for connect-four-ai
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pip index versions connect4
+  └ connect4 (0.0.3)
+    Available versions: 0.0.3
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pip index versions bitbully
+  └ bitbully (0.0.76)
+    Available versions: 0.0.76, 0.0.75, 0.0.74, 0.0.73, 0.0.72, 0.0.71, 0.0.70,
+    0.0.69, 0.0.58, 0.0.57, 0.0.53, 0.0.45
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pip index versions connect-four
+  └ ERROR: No matching distribution found for connect-four
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pytest -q
+  └ ............
+    [100%]
+    12 passed in 85.05s (0:01:25)
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pytest -vv
+  └ collected 12 items
+
+    … +19 lines
+    ======================== 12 passed in 85.20s (0:01:25)
+    =========================
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pip install bitbully
+  └ Collecting bitbully
+      Using cached
+    … +9 lines
+
+    Successfully installed bitbully-0.0.76 bitbully-databases-0.0.2
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ import bitbully, inspect
+  │ print(bitbully)
+  │ … +2 lines
+  └ <module 'bitbully' from '/home/johnk/Documents/connect4/.venv/lib/
+    python3.12/site-packages/bitbully/__init__.py'>
+    … +2 lines
+    '__name__', '__package__', '__path__', '__spec__', '__version__',
+    'bitbully_core', 'board', 'solver']
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ import importlib.metadata
+  │ print(importlib.metadata.metadata('bitbully')['Summary'])
+  │ … +2 lines
+  └ <stdin>:3: DeprecationWarning: Implicit None on return values is deprecated
+    and will raise KeyErrors.
+    A fast Connect-4 Solver for Python & C++
+    None
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ from bitbully import BitBully, Board
+  │ import inspect
+  │ … +2 lines
+  └ class BitBully:
+        """A Connect Four AI agent with optional opening book support.
+    … +639 lines
+            return get_args(OpeningBookName)
+
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ from bitbully import Board
+  │ import inspect
+  │ … +2 lines
+  └ class Board:
+        """Represents the state of a Connect Four board. Mostly a thin wrapper
+    … +1915 lines
+            return [self._board.getColumnHeight(col) for col in range(7)]
+
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ from bitbully import Board
+  │ import inspect
+  │ … +4 lines
+  └ has play True
+    ['can_win_next', 'count_tokens', 'current_player', 'play', 'to_string']
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ from bitbully import Board, BitBully
+  │ from connect4_az.game import Connect4State
+  │ … +10 lines
+  └ legal [0, 3, 1, 2, 4, 5, 6]
+    scores {3: -6, 0: -18, 1: -18, 2: -18, 4: -18, 5: -18, 6: -18}
+    mtdf -6
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ from bitbully import Board
+  │ board = Board([0,3,0,3,1,3])
+  │ … +3 lines
+  └ ['_board', 'from_array', 'random_board', 'reset_board', 'to_array']
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ from bitbully import Board
+  │ board = Board([0,3,0,3,1,3])
+  │ … +3 lines
+  └ <class 'list'> [[1, 1, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0],
+    [2, 2, 2, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0,
+    0]]
+
+─ Worked for 2m 05s ────────────────────────────────────────────────────────────
+
+• I have a better oracle path now. I’m replacing the slow pure-Python solver
+  with bitbully, which gives exact Connect 4 search plus an opening book, and
+  I’m wiring the training sampler to use its legal random-board generator so the
+  data path is fast enough for the actual 3-hour run.
+
+• Edited 4 files (+82 -76)
+  └ connect4/pyproject.toml (+1 -0)
+    11  dependencies = [
+    12 +  "bitbully>=0.0.76",
+    13    "numpy>=2.4",
+
+  └ connect4/src/connect4_az/game.py (+49 -1)
+      3  from dataclasses import dataclass
+      4 -from typing import Iterable
+      4 +from typing import Iterable, Sequence
+      5
+        ⋮
+    152
+    153 +    def to_column_array(self) -> list[list[int]]:
+    154 +        columns = [[0 for _ in range(ROWS)] for _ in range(COLUMNS)]
+    155 +        for column in range(COLUMNS):
+    156 +            base = column * BITS_PER_COLUMN
+    157 +            for row in range(ROWS):
+    158 +                bit = 1 << (base + row)
+    159 +                if self.p1 & bit:
+    160 +                    columns[column][row] = 1
+    161 +                elif self.p2 & bit:
+    162 +                    columns[column][row] = 2
+    163 +        return columns
+    164 +
+    165      def to_array(self) -> np.ndarray:
+        ⋮
+    220      return moves
+    221 +
+    222 +
+    223 +def state_from_column_array(columns: Sequence[Sequence[int]]) -> Connec
+         t4State:
+    224 +    if len(columns) != COLUMNS:
+    225 +        raise ValueError(f"expected {COLUMNS} columns, got {len(columns
+         )}")
+    226 +    p1 = 0
+    227 +    p2 = 0
+    228 +    p1_count = 0
+    229 +    p2_count = 0
+    230 +    for column, values in enumerate(columns):
+    231 +        if len(values) != ROWS:
+    232 +            raise ValueError(f"column {column} must contain {ROWS} rows
+         ")
+    233 +        empty_seen = False
+    234 +        for row, value in enumerate(values):
+    235 +            if value == 0:
+    236 +                empty_seen = True
+    237 +                continue
+    238 +            if empty_seen:
+    239 +                raise ValueError("board contains floating pieces")
+    240 +            bit = 1 << (column * BITS_PER_COLUMN + row)
+    241 +            if value == 1:
+    242 +                p1 |= bit
+    243 +                p1_count += 1
+    244 +            elif value == 2:
+    245 +                p2 |= bit
+    246 +                p2_count += 1
+    247 +            else:
+    248 +                raise ValueError(f"unexpected cell value {value!r}")
+    249 +    if p1_count < p2_count or p1_count - p2_count > 1:
+    250 +        raise ValueError("invalid player counts")
+    251 +    return Connect4State(
+    252 +        p1=p1,
+    253 +        p2=p2,
+    254 +        to_play=1 if p1_count == p2_count else -1,
+    255 +        moves_played=p1_count + p2_count,
+    256 +    )
+
+  └ connect4/src/connect4_az/solver.py (+28 -59)
+     4
+     5 +from bitbully import BitBully, Board
+     6 +
+     7  from connect4_az.game import Connect4State
+       ⋮
+    17  class Connect4Solver:
+    16 -    def __init__(self) -> None:
+    17 -        self._value_cache: dict[tuple[int, int, int, int], int] = {}
+    18 +    def __init__(self, opening_book: str | None = "default") -> None:
+    19 +        self._agent = BitBully(opening_book=opening_book)
+    20          self.nodes = 0
+       ⋮
+    22      def cached_positions(self) -> int:
+    21 -        return len(self._value_cache)
+    23 +        return 0
+    24
+       ⋮
+    26          terminal_value = state.terminal_value()
+    25 -        legal_moves = state.ordered_legal_moves()
+    27          if terminal_value is not None:
+    28              return SolveResult(value=terminal_value, best_moves=(), move
+        _values={})
+    28 -        winning_moves = state.winning_moves()
+    29 -        if winning_moves:
+    30 -            move_values = {move: 1 for move in winning_moves}
+    31 -            if full_move_values:
+    32 -                for move in legal_moves:
+    33 -                    move_values.setdefault(move, -self.value(state.play(
+        move)))
+    34 -            return SolveResult(value=1, best_moves=winning_moves, move_v
+        alues=move_values)
+    35 -        forced_reply = self._forced_block_move(state)
+    36 -        if forced_reply == -2:
+    37 -            return SolveResult(value=-1, best_moves=(), move_values={mov
+        e: -1 for move in legal_moves})
+    38 -        candidate_moves = legal_moves if forced_reply is None else (forc
+        ed_reply,)
+    39 -        move_values: dict[int, int] = {}
+    40 -        best_value = -2
+    41 -        for move in candidate_moves:
+    42 -            score = -self.value(state.play(move))
+    43 -            move_values[move] = score
+    44 -            if score > best_value:
+    45 -                best_value = score
+    46 -        if forced_reply is not None:
+    47 -            for move in legal_moves:
+    48 -                move_values.setdefault(move, -1)
+    49 -        best_moves = tuple(move for move in candidate_moves if move_valu
+        es[move] == best_value)
+    50 -        if full_move_values and forced_reply is None:
+    51 -            for move in legal_moves:
+    52 -                move_values.setdefault(move, -self.value(state.play(move
+        )))
+    53 -        return SolveResult(value=best_value, best_moves=best_moves, move
+        _values=move_values)
+    29 +        board = self._board_from_state(state)
+    30 +        self._agent.reset_node_counter()
+    31 +        raw_scores = self._agent.score_all_moves(board)
+    32 +        self.nodes += self._agent.get_node_counter()
+    33 +        move_values = {move: self._score_to_value(score) for move, score
+         in raw_scores.items()}
+    34 +        best_score = max(raw_scores.values())
+    35 +        best_moves = tuple(move for move in state.ordered_legal_moves()
+        if raw_scores.get(move) == best_score)
+    36 +        value = self._score_to_value(best_score)
+    37 +        if not full_move_values:
+    38 +            move_values = {move: move_values[move] for move in best_move
+        s}
+    39 +        return SolveResult(value=value, best_moves=best_moves, move_valu
+        es=move_values)
+    40
+       ⋮
+    44              return terminal_value
+    59 -        winning_moves = state.winning_moves()
+    60 -        if winning_moves:
+    45 +        self._agent.reset_node_counter()
+    46 +        score = self._agent.mtdf(self._board_from_state(state))
+    47 +        self.nodes += self._agent.get_node_counter()
+    48 +        return self._score_to_value(score)
+    49 +
+    50 +    @staticmethod
+    51 +    def _score_to_value(score: int) -> int:
+    52 +        if score > 0:
+    53              return 1
+    62 -        forced_reply = self._forced_block_move(state)
+    63 -        if forced_reply == -2:
+    54 +        if score < 0:
+    55              return -1
+    65 -        key = state.canonical_key()
+    66 -        cached = self._value_cache.get(key)
+    67 -        if cached is not None:
+    68 -            return cached
+    69 -        self.nodes += 1
+    70 -        best = -1
+    71 -        alpha_local = alpha
+    72 -        candidate_moves = state.ordered_legal_moves() if forced_reply is
+         None else (forced_reply,)
+    73 -        for move in candidate_moves:
+    74 -            score = -self.value(state.play(move), -beta, -alpha_local)
+    75 -            if score > best:
+    76 -                best = score
+    77 -            if best > alpha_local:
+    78 -                alpha_local = best
+    79 -            if alpha_local >= beta or best == 1:
+    80 -                break
+    81 -        self._value_cache[key] = best
+    82 -        return best
+    56 +        return 0
+    57
+    58      @staticmethod
+    85 -    def _forced_block_move(state: Connect4State) -> int | None:
+    86 -        opponent_wins = state.winning_moves(player=-state.to_play)
+    87 -        if len(opponent_wins) >= 2:
+    88 -            return -2
+    89 -        if len(opponent_wins) == 1:
+    90 -            return opponent_wins[0]
+    91 -        return None
+    59 +    def _board_from_state(state: Connect4State) -> Board:
+    60 +        return Board(state.to_column_array())
+
+  └ connect4/src/connect4_az/training.py (+4 -16)
+    11  import torch
+    12 +from bitbully import Board
+    13  from torch.utils.data import DataLoader, TensorDataset
+       ⋮
+    15
+    15 -from connect4_az.game import COLUMNS, Connect4State, MAX_MOVES
+    16 +from connect4_az.game import COLUMNS, Connect4State, state_from_column_a
+        rray
+    17  from connect4_az.mcts import MCTSConfig, choose_action, run_mcts
+       ⋮
+    77      target_depth = int(rng.integers(min_depth, max_depth + 1))
+    77 -    state = Connect4State()
+    78 -    for _ in range(target_depth):
+    79 -        legal_moves = state.legal_moves()
+    80 -        if not legal_moves:
+    81 -            break
+    82 -        if rng.random() < 0.2:
+    83 -            move = legal_moves[int(rng.integers(0, len(legal_moves)))]
+    84 -        else:
+    85 -            move = state.ordered_legal_moves()[int(rng.integers(0, len(l
+        egal_moves)))]
+    86 -        state = state.play(move)
+    87 -        if state.is_terminal():
+    88 -            break
+    89 -    if state.is_terminal() and state.moves_played < MAX_MOVES:
+    90 -        return _sample_random_state(rng, min_depth, max_depth)
+    91 -    return state
+    78 +    board, _ = Board.random_board(target_depth, forbid_direct_win=bool(r
+        ng.random() < 0.7))
+    79 +    return state_from_column_array(board.to_array())
+    80
+
+• Ran pkill -f '/home/johnk/Documents/connect4/.venv/bin/pytest' || true
+  └ (no output)
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ from connect4_az.game import Connect4State
+  │ from connect4_az.solver import Connect4Solver
+  │ … +6 lines
+  └ SolveResult(value=-1, best_moves=(3,), move_values={3: -1})
+    nodes 942
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pip install -e .
+  └ Obtaining file:///home/johnk/Documents/connect4
+      Installing build dependencies: started
+    … +52 lines
+          Successfully uninstalled connect4-az-0.1.0
+    Successfully installed connect4-az-0.1.0
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The exact oracle is fixed now. The blocking state that previously hung is
+  solving instantly with bitbully, so I’m rerunning the full test suite and then
+  a short end-to-end training smoke test on GPU.
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ from connect4_az.game import Connect4State, state_from_column_array
+  │ state = Connect4State.from_moves([0,3,0,3,1,3])
+  │ … +3 lines
+  └ True
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pytest -q
+  └ ............
+    [100%]
+    12 passed in 0.84s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m past unit correctness. The next step is a tiny GPU smoke run that
+  exercises dataset generation, checkpointing, evaluation, MCTS self-play,
+  logging, and the CLI paths before I launch the long unattended training job.
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/connect4-az train --run-dir /
+  │ home/johnk/Documents/connect4/runs/smoke --device cuda
+  │ --solver-train-positions 200 --solver-val-positions 40 --pretrain-epochs 2
+  │ … +4 lines
+solver-train:  12%|█▎        | 0/200 [00:00<?, ?it/s]
+solver-train:  29%|██▉       | 58/200]
+    … +28 lines
+      "value_sign_rate": 0.75
+    }
+
+• Waited for background terminal
+
+─ Worked for 1m 05s ────────────────────────────────────────────────────────────
+
+• The full stack is now working: exact-oracle labels, GPU training, self-play,
+  checkpoints, JSON logs, and final evaluation. I’m tuning the actual long run
+  parameters now so the unattended run uses the available time instead of just
+  finishing early with a mediocre model.
+
+• Waited for background terminal · /home/johnk/Documents/connect4/.venv/bin/
+connect4-az train --run-dir /home/johnk/Documents/connect4/runs/pilot1 --device
+cuda --solver-train-positions 20000 --solver-val-positions 2000 --pretrain-
+epochs 12 --self-play-iterations 6 --self-play-games 80 --self-play-epochs 2
+--train-mcts-simulations 128 --eval-mcts-simulations 256 --play-mcts-simulations
+1024 --final-eval-positions 300 --channels 64 --blocks 4 --batch-size 512
+
+• The training pilot is running. While it’s generating data, I’m improving the
+  interactive board display so the final command feels like an actual Connect 4
+  setup instead of a bare debugging printout.
+
+• Edited 2 files (+12 -6)
+  └ connect4/src/connect4_az/cli.py (+4 -2)
+     96          print(f"Checkpoint summary: {json.dumps(metadata, sort_keys=Tru
+         e)}")
+     97 +    print(f"Yellow moves first. {'Human' if human_player == 1 else 'Age
+         nt'} is Yellow.")
+     98 +    print(f"{'Human' if human_player == -1 else 'Agent'} is Red.")
+     99      while not state.is_terminal():
+    100          print()
+     99 -        print(state.render(human_player=human_player))
+    101 +        print(state.render(use_color=sys.stdout.isatty()))
+    102          if state.to_play == human_player:
+        ⋮
+    121      print()
+    120 -    print(state.render(human_player=human_player))
+    122 +    print(state.render(use_color=sys.stdout.isatty()))
+    123      winner = state.winner()
+
+  └ connect4/src/connect4_az/game.py (+8 -4)
+    192
+    193 -    def render(self, human_player: int | None = None) -> str:
+    193 +    def render(self, use_color: bool = False) -> str:
+    194          board = self.to_array()
+        ⋮
+    202                      symbols.append(" . ")
+    203 -                elif human_player is None:
+    204 -                    symbols.append(" X " if value == 1 else " O ")
+    203                  else:
+    206 -                    symbols.append(" H " if value == human_player else
+         " A ")
+    204 +                    symbols.append(self._disc(value, use_color))
+    205              rows.append("|" + "|".join(symbols) + "|")
+        ⋮
+    208
+    209 +    @staticmethod
+    210 +    def _disc(value: int, use_color: bool) -> str:
+    211 +        if value == 1:
+    212 +            return " Y " if not use_color else " \033[33mO\033[0m "
+    213 +        return " R " if not use_color else " \033[31mO\033[0m "
+    214 +
+    215
+
+• Waited for background terminal · /home/johnk/Documents/connect4/.venv/bin/
+connect4-az train --run-dir /home/johnk/Documents/connect4/runs/pilot1 --device
+cuda --solver-train-positions 20000 --solver-val-positions 2000 --pretrain-
+epochs 12 --self-play-iterations 6 --self-play-games 80 --self-play-epochs 2
+--train-mcts-simulations 128 --eval-mcts-simulations 256 --play-mcts-simulations
+1024 --final-eval-positions 300 --channels 64 --blocks 4 --batch-size 512
+
+─ Worked for 1m 45s ────────────────────────────────────────────────────────────
+
+• The pilot run is progressing normally. Data generation is the slowest front-
+  end stage so far, but it’s within range for a much larger overnight-style
+  configuration, and I’ll use the pilot’s holdout metrics to decide whether to
+  lean harder on exact supervised labels or on self-play for the final long run.
+
+• Waited for background terminal · /home/johnk/Documents/connect4/.venv/bin/
+connect4-az train --run-dir /home/johnk/Documents/connect4/runs/pilot1 --device
+cuda --solver-train-positions 20000 --solver-val-positions 2000 --pretrain-
+epochs 12 --self-play-iterations 6 --self-play-games 80 --self-play-epochs 2
+--train-mcts-simulations 128 --eval-mcts-simulations 256 --play-mcts-simulations
+1024 --final-eval-positions 300 --channels 64 --blocks 4 --batch-size 512
+
+• Explored
+  └ Read train.jsonl, status.json
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The pilot shows an important pattern: exact supervised pretraining is
+  extremely fast once the dataset exists, so the useful tradeoff is mostly “more
+  exact labels vs. more self-play,” not “more epochs.” I’m watching the first
+  few self-play iterations now so I can size the final run to actually consume
+  the available 3-hour window.
+
+• Waited for background terminal · /home/johnk/Documents/connect4/.venv/bin/
+connect4-az train --run-dir /home/johnk/Documents/connect4/runs/pilot1 --device
+cuda --solver-train-positions 20000 --solver-val-positions 2000 --pretrain-
+epochs 12 --self-play-iterations 6 --self-play-games 80 --self-play-epochs 2
+--train-mcts-simulations 128 --eval-mcts-simulations 256 --play-mcts-simulations
+1024 --final-eval-positions 300 --channels 64 --blocks 4 --batch-size 512
+
+• Explored
+  └ Read train.jsonl, status.json
+
+─ Worked for 1m 20s ────────────────────────────────────────────────────────────
+
+• I found one scheduling issue in the trainer: the same final_eval_positions
+  value was being used for both per-iteration self-play evals and the final
+  large eval, which would waste time in the long run. I’m separating those so
+  the trainer can do cheap iteration tracking and a genuinely large final
+  benchmark.
+
+• Edited 2 files (+4 -1)
+  └ connect4/src/connect4_az/cli.py (+2 -0)
+    35      train_parser.add_argument("--eval-mcts-simulations", type=int, defau
+        lt=512)
+    36 +    train_parser.add_argument("--iteration-eval-positions", type=int, de
+        fault=200)
+    37      train_parser.add_argument("--play-mcts-simulations", type=int, defau
+        lt=1600)
+       ⋮
+    72          eval_mcts_simulations=args.eval_mcts_simulations,
+    73 +        iteration_eval_positions=args.iteration_eval_positions,
+    74          play_mcts_simulations=args.play_mcts_simulations,
+
+  └ connect4/src/connect4_az/training.py (+2 -1)
+     42      eval_mcts_simulations: int = 512
+     43 +    iteration_eval_positions: int = 200
+     44      play_mcts_simulations: int = 1600
+        ⋮
+    302              device=device,
+    302 -            positions=train_config.final_eval_positions // 2,
+    303 +            positions=train_config.iteration_eval_positions,
+    304              simulations=train_config.eval_mcts_simulations,
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python -m py_compile /home/johnk/
+  │ Documents/connect4/src/connect4_az/*.py
+  └ (no output)
+
+• Explored
+  └ Read train.jsonl, status.json
+
+─ Worked for 1m 15s ────────────────────────────────────────────────────────────
+
+• The first self-play iteration came back with mcts_optimal_move_rate ~= 0.787
+  on exact holdout positions. That’s not near-optimal yet, but it’s a healthy
+  signal that the system is improving rather than just memorizing the supervised
+  set; I’m letting the pilot continue long enough to estimate the gain per
+  iteration before I lock the 3-hour final run.
+
+• Ran if [ -f /home/johnk/Documents/connect4/runs/pilot1/logs/eval.jsonl ]; then
+  │ tail -n 5 /home/johnk/Documents/connect4/runs/pilot1/logs/eval.jsonl; fi
+  └ (no output)
+
+• Explored
+  └ Read train.jsonl
+
+• Ran ps -fp $(pgrep -f '/home/johnk/Documents/connect4/.venv/bin/connect4-az
+  │ train --run-dir /home/johnk/Documents/connect4/runs/pilot1' | tr '\n' ' ')
+  │ || true
+  └ UID          PID    PPID  C STIME TTY      STAT   TIME CMD
+    johnk      96767   95115 99 12:54 ?        Rsl    5:11 /home/johnk/
+    … +8 lines
+    $(pgrep -f '/home/johnk/Documents/connect4/.venv/bin/connect4-az train
+    --run-dir /home/johnk/Documents/connect4/runs/pilot1' | tr '\n' ' ') || true
+
+─ Worked for 1m 06s ────────────────────────────────────────────────────────────
+
+• I have enough information to standardize the final run layout, so I’m adding
+  the human-facing play command now. That way the finished checkpoint will
+  already have a stable wrapper script instead of relying on a long manual
+  invocation.
+
+• Added connect4/play_friend.sh (+19 -0)
+     1 +#!/usr/bin/env bash
+     2 +set -euo pipefail
+     3 +
+     4 +ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+     5 +CHECKPOINT="${ROOT_DIR}/runs/final/best.pt"
+     6 +HUMAN_SIDE="${1:-second}"
+     7 +SIMULATIONS="${SIMULATIONS:-2400}"
+     8 +DEVICE="${DEVICE:-cuda}"
+     9 +
+    10 +if [[ ! -f "${CHECKPOINT}" ]]; then
+    11 +  echo "Checkpoint not found: ${CHECKPOINT}" >&2
+    12 +  exit 1
+    13 +fi
+    14 +
+    15 +exec "${ROOT_DIR}/.venv/bin/connect4-az" play \
+    16 +  --checkpoint "${CHECKPOINT}" \
+    17 +  --human "${HUMAN_SIDE}" \
+    18 +  --device "${DEVICE}" \
+    19 +  --simulations "${SIMULATIONS}"
+
+• Ran chmod +x /home/johnk/Documents/connect4/play_friend.sh
+  └ (no output)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The fixed play wrapper is in place as ./play_friend.sh; it will target runs/
+  final/best.pt once the long run lands. I’m still watching the pilot’s learning
+  curve to size the final run aggressively but not wastefully.
+
+• Explored
+  └ Read train.jsonl, status.json
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I have enough signal from the pilot. It showed exact-label pretraining is
+  effective and that self-play improvements are real; I’m stopping the pilot,
+  running one final quick regression check on the latest source, and then I’m
+  starting the long final training run under a live monitor.
+
+• Ran pkill -f '/home/johnk/Documents/connect4/.venv/bin/connect4-az train
+  │ --run-dir /home/johnk/Documents/connect4/runs/pilot1' || true
+  └ (no output)
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/connect4-az train --run-dir /
+  │ home/johnk/Documents/connect4/runs/pilot1 --device cuda
+  │ --solver-train-positions 20000 --solver-val-positions 2000
+  │ … +4 lines
+solver-train:   0%|          | 0/20000 [00:00<?, ?it/s]
+solver-train:   0%|          | 32/20000]
+    … +681 lines
+selfplay-3:  76%|███████▋  | 61/80 [01:21<00:27,
+selfplay-3:  78%|███████▊  | 62/80 [01:22<00:26,  1.47s/it]
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/pytest -q
+  └ ............
+    [100%]
+    12 passed in 0.83s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The codebase is green again after the last trainer and CLI changes. I’m
+  starting the actual final run now in runs/final, with a fixed play wrapper
+  pointed at that checkpoint path, and I’ll keep a live monitor session attached
+  so the status is always visible without typing.
+
+• Updated Plan
+  └ Core implementation and tests are complete; launching the long training/
+    evaluation run and monitor.
+    ✔ Create project scaffold, exact game engine, tests, and venv with PyTorch
+      nightly CUDA 12.8
+    ✔ Implement AlphaZero components: network, MCTS, solver-guided pretraining,
+      self-play fine-tuning
+    ✔ Add interactive human-vs-agent CLI with first/second player options and
+      physical board display
+    □ Run monitored training/evaluation until the network+MCTS agent is near-
+      optimal
+
+• Explored
+  └ List runs
+
+• Ran mkdir -p /home/johnk/Documents/connect4/runs/final
+  └ (no output)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The final run is live under runs/final, and the monitor session is attached.
+  Right now it’s in the exact-label dataset phase on GPU/CPU, with the human-
+  facing play wrapper already targeting the eventual runs/final/best.pt.
+
+• Waited for background terminal · /home/johnk/Documents/connect4/.venv/bin/
+connect4-az monitor --run-dir /home/johnk/Documents/connect4/runs/final
+--refresh-seconds 5
+
+• The monitor is fine once JSON logs appear, but during dataset generation it’s
+  too quiet because the trainer only writes structured logs after each phase.
+  I’m tightening the monitor so it also tails the trainer’s stdout log, then
+  I’ll restart the foreground monitor session so the progress stays visible
+  throughout the long exact-label build.
+
+• Edited connect4/src/connect4_az/cli.py (+9 -0)
+    139      eval_log = run_dir / "logs" / "eval.jsonl"
+    140 +    stdout_log = run_dir / "train.stdout.log"
+    141      while True:
+        ⋮
+    176              print()
+    177 +        print("Recent stdout:")
+    178 +        if stdout_log.exists():
+    179 +            lines = stdout_log.read_text(encoding="utf-8", errors="repl
+         ace").splitlines()
+    180 +            for line in lines[-8:]:
+    181 +                print(line)
+    182 +        else:
+    183 +            print("  no stdout log yet")
+    184 +        print()
+    185          try:
+
+↳ Interacted with background terminal · /home/johnk/Documents/connect4/.venv/
+bin/connect4-az monitor --run-dir /home/johnk/Documents/connect4/runs/final
+--refresh-seconds 5
+  └ 
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/connect4-az monitor --run-dir /
+  │ home/johnk/Documents/connect4/runs/final --refresh-seconds 5
+  └ Run dir: /home/johnk/Documents/connect4/runs/final
+    Time: 2026-03-25 13:01:55
+    … +481 lines
+
+    ^C
+
+─ Worked for 1m 05s ────────────────────────────────────────────────────────────
+
+• The foreground monitor is fixed and now showing the exact-label build directly
+  from train.stdout.log. The run is on pace: about 5% of the 250k training
+  positions are solved after roughly a minute, which keeps the overall schedule
+  inside the intended multi-hour window.
+
+• Waited for background terminal · /home/johnk/Documents/connect4/.venv/bin/
+connect4-az monitor --run-dir /home/johnk/Documents/connect4/runs/final
+--refresh-seconds 5
+
+• The exact-label phase is slower than the midgame-only pilot, which is expected
+  because I widened the depth range down to opening positions. That’s
+  intentional; it costs extra upfront but it gives the model much better
+  coverage from the empty board, which matters more than squeezing a few extra
+  self-play iterations out of the budget.
+
+• Waited for background terminal · /home/johnk/Documents/connect4/.venv/bin/
+connect4-az monitor --run-dir /home/johnk/Documents/connect4/runs/final
+--refresh-seconds 5
+
+• The run is behaving as expected. Opening-inclusive oracle generation costs
+  more than the earlier pilot, but the pace is steady at roughly 40% of the 250k
+  exact training positions after about 8.5 minutes, which is right where I
+  wanted it.
+
+• Waited for background terminal · /home/johnk/Documents/connect4/.venv/bin/
+connect4-az monitor --run-dir /home/johnk/Documents/connect4/runs/final
+--refresh-seconds 5
+
+• The opening-inclusive exact phase finished on schedule, and the model is
+  already in a strong place before self-play: validation policy_top1 is around
+  0.928 and value_sign around 0.864 midway through the 24-epoch pretrain. That’s
+  materially better than the small pilot, so the long run is on track.
+
+• Waited for background terminal · /home/johnk/Documents/connect4/.venv/bin/
+connect4-az monitor --run-dir /home/johnk/Documents/connect4/runs/final
+--refresh-seconds 5
+
+• Pretrain is done and the run has entered self-play. The exact-label warm start
+  is strong: it settled around policy_top1 ~= 0.924-0.928 and value_sign ~=
+  0.866, so the remaining work is mostly converting that supervised strength
+  into stronger MCTS-guided play.
+
+• Waited for background terminal · /home/johnk/Documents/connect4/.venv/bin/
+connect4-az monitor --run-dir /home/johnk/Documents/connect4/runs/final
+--refresh-seconds 5
+
+• The long run is into its steady-state self-play loop now. Early self-play
+  numbers are already stronger than the pilot’s first iterations: exact-holdout
+  mcts_optimal_move_rate is about 0.89 with 256 search sims and tactical
+  accuracy is essentially perfect on the sampled test set, so I’m letting it
+  accumulate more iterations before I decide whether it needs a second training
+  phase.
+
+• Waited for background terminal · sleep 300
+
+• Ran sleep 300
+  └ (no output)
+
+• Explored
+  └ Read train.jsonl, status.json, train.stdout.log
+
+─ Worked for 29m 17s ───────────────────────────────────────────────────────────
+
+• The first few self-play iterations are not monotonically improving, but that’s
+  normal with only 200 sampled eval positions per iteration; the signal is still
+  that the best checkpoint is materially stronger than the pilot. I’m letting
+  several more iterations accumulate before I judge whether this run has
+  converged high enough or whether it needs a second oracle-heavy phase
+  afterward.
+
+• Waited for background terminal · sleep 900
+
+• Ran sleep 900
+  └ (no output)
+
+• Explored
+  └ Read status.json, train.jsonl, train.stdout.log
+
+─ Worked for 15m 40s ───────────────────────────────────────────────────────────
+
+• The self-play curve has flattened and even drifted down on the small exact-
+  holdout probe, so I’m checking the current best.pt metadata before I decide
+  whether to let this continue or pivot the remaining time into a larger oracle-
+  distillation run. If self-play is just adding noise, the better use of the
+  budget is another solver-heavy phase, not blindly riding this config to the
+  end.
+
+• Ran nvidia-smi --query-compute-apps=pid,process_name,used_memory
+  │ --format=csv,noheader,nounits
+  └ 97128, /home/johnk/Documents/connect4/.venv/bin/python3, 684
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ import torch
+  │ payload = torch.load('/home/johnk/Documents/connect4/runs/final/best.pt',
+  │ … +3 lines
+  └ {'phase': 'self_play', 'iteration': 2, 'examples': 6009, 'train_loss':
+    1.4301346774941615, 'seconds': 278.4454114437103, 'positions': 200,
+    'policy_optimal_move_rate': 0.875, 'mcts_optimal_move_rate': 0.885,
+    'value_sign_rate': 0.845, 'tactical_optimal_move_rate': 0.9787234042553191,
+    'solver_nodes': 21429423, 'solver_cache': 0, 'simulations': 256}
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The evidence points one way now: self-play from this exact warm start is not
+  buying enough solver agreement to justify spending the rest of the budget
+  there. I’m freezing the current best self-play checkpoint, stopping that run,
+  and pivoting the remaining time into a much larger exact-oracle distillation
+  run with a bigger network, then I’ll compare the checkpoints and keep the
+  stronger one for play_friend.sh.
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/connect4-az train --run-dir /
+  │ home/johnk/Documents/connect4/runs/final --device cuda
+  │ --solver-train-positions 250000 --solver-val-positions 20000
+  │ … +6 lines
+  └ (no output)
+
+• Ran pkill -f '/home/johnk/Documents/connect4/.venv/bin/connect4-az train
+  │ --run-dir /home/johnk/Documents/connect4/runs/final' || true
+  └ (no output)
+
+• Ran mkdir -p /home/johnk/Documents/connect4/runs/oracle && cp /home/johnk/
+  │ Documents/connect4/runs/final/best.pt /home/johnk/Documents/connect4/runs/
+  │ oracle/selfplay_best_snapshot.pt
+  └ (no output)
+
+• Ran pgrep -af 'connect4-az monitor --run-dir /home/johnk/Documents/connect4/
+  │ runs/final' || true
+  └ 97249 /home/johnk/Documents/connect4/.venv/bin/python3 /home/johnk/
+    Documents/connect4/.venv/bin/connect4-az monitor --run-dir /home/johnk/
+    Documents/connect4/runs/final --refresh-seconds 5
+    100850 /bin/bash -lc pgrep -af 'connect4-az monitor --run-dir /home/johnk/
+    Documents/connect4/runs/final' || true
+
+• Ran pgrep -af 'connect4-az train --run-dir /home/johnk/Documents/connect4/
+  │ runs/final' || true
+  └ 100849 /bin/bash -lc pgrep -af 'connect4-az train --run-dir /home/johnk/
+    Documents/connect4/runs/final' || true
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The self-play branch is frozen. I’m starting the second branch now: a larger
+  pure-oracle run with a bigger net and a much larger exact dataset. This is the
+  highest-probability way to improve solver agreement in the remaining time, and
+  I’ll compare it directly against the saved self-play snapshot before choosing
+  the final checkpoint.
+
+↳ Interacted with background terminal · /home/johnk/Documents/connect4/.venv/
+bin/connect4-az monitor --run-dir /home/johnk/Documents/connect4/runs/final
+--refresh-seconds 5
+  └ 
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/connect4-az monitor --run-dir /
+  │ home/johnk/Documents/connect4/runs/final --refresh-seconds 5
+  └ Run dir: /home/johnk/Documents/connect4/runs/final
+    Time: 2026-03-25 13:02:58
+    … +18053 lines
+
+    ^C
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The second branch is underway. This one removes self-play entirely and spends
+  the remaining budget on exact solver labels plus a larger network, which is
+  the right bet given that the first branch plateaued around 0.885 MCTS-optimal
+  on the exact probe while the raw oracle-imitation policy was already stronger.
+
+• Waited for background terminal · sleep 1200
+
+• Ran sleep 1200
+  └ (no output)
+
+• Explored
+  └ Read status.json, train.jsonl, train.stdout.log
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ import torch, os
+  │ path = '/home/johnk/Documents/connect4/runs/oracle/best.pt'
+  │ … +5 lines
+  └ best_exists False
+
+─ Worked for 20m 51s ───────────────────────────────────────────────────────────
+
+• The 1.5M-oracle branch is too slow relative to the remaining wall-clock
+  budget. I’m cutting it now and replacing it with a smaller but still solver-
+  heavy oracle run that can actually finish, evaluate, and be compared against
+  the self-play checkpoint before you get back.
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/connect4-az train --run-dir /
+  │ home/johnk/Documents/connect4/runs/oracle --device cuda
+  │ --solver-train-positions 1500000 --solver-val-positions 60000
+  │ … +6 lines
+  └ (no output)
+
+• Ran pkill -f '/home/johnk/Documents/connect4/.venv/bin/connect4-az train
+  │ --run-dir /home/johnk/Documents/connect4/runs/oracle' || true
+  └ (no output)
+
+• Ran mkdir -p /home/johnk/Documents/connect4/runs/oracle_fast && cp /home/
+  │ johnk/Documents/connect4/runs/oracle/selfplay_best_snapshot.pt /home/
+  │ johnk/Documents/connect4/runs/oracle_fast/selfplay_best_snapshot.pt
+  └ (no output)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m using a tighter final configuration now: enough exact data to materially
+  beat the self-play branch if this strategy is the better one, but not so much
+  that we lose the chance to complete a real final evaluation.
+
+↳ Interacted with background terminal · /home/johnk/Documents/connect4/.venv/
+bin/connect4-az monitor --run-dir /home/johnk/Documents/connect4/runs/oracle
+--refresh-seconds 5
+  └ 
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/connect4-az monitor --run-dir /
+  │ home/johnk/Documents/connect4/runs/oracle --refresh-seconds 5
+  └ Run dir: /home/johnk/Documents/connect4/runs/oracle
+    Time: 2026-03-25 13:49:39
+    … +13983 lines
+
+    ^C
+
+────────────────────────────────────────────────────────────────────────────────
+
+• This last branch has the right shape now: the exact data volume is large
+  enough to matter, but small enough that the whole run can still complete and
+  be benchmarked. I’m leaving it alone until it reaches the first real
+  checkpoints instead of spending more time on replanning.
+
+• Waited for background terminal · sleep 1200
+
+• Ran sleep 1200
+  └ (no output)
+
+• Explored
+  └ Read status.json, train.jsonl, train.stdout.log
+
+─ Worked for 20m 22s ───────────────────────────────────────────────────────────
+
+• The 500k-oracle branch is pacing acceptably: about half the exact training
+  positions are solved after a bit over 20 minutes, which keeps the full run
+  inside the remaining budget. I’m leaving it alone until the first supervised
+  checkpoints appear.
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/connect4-az train --run-dir /
+  │ home/johnk/Documents/connect4/runs/oracle_fast --device cuda
+  │ --solver-train-positions 500000 --solver-val-positions 20000
+  │ … +6 lines
+  └ (no output)
+
+• Waited for background terminal · sleep 1200
+
+• Ran sleep 1200
+  └ (no output)
+
+• Explored
+  └ Read status.json, train.jsonl, train.stdout.log
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ import torch, os
+  │ for name in ['best.pt','latest.pt']:
+  │ … +6 lines
+  └ best.pt True
+    {'phase': 'final_eval', 'epoch': 16, 'train_loss': 0.5681654119262696, 'lr':
+    … +11 lines
+    'policy_loss': 0.7920450166702271, 'value_loss': 0.15339050543308258,
+    'policy_top1': 0.93745, 'value_sign': 0.871}
+
+─ Worked for 20m 30s ───────────────────────────────────────────────────────────
+
+• The oracle-heavy branch finished and it’s clearly stronger than the self-play
+  branch on the metric that matters: exact-solver agreement. On a 1,200-position
+  holdout with 2,048 MCTS simulations per move, it reached
+  mcts_optimal_move_rate = 0.9483, policy_optimal_move_rate = 0.9242,
+  tactical_optimal_move_rate = 1.0, and value_sign_rate = 0.8717. I’m running
+  one more stringent check now: full games from the empty board against the
+  perfect solver.
+
+• Waited for background terminal · /home/johnk/Documents/connect4/.venv/bin/
+python - <<'PY'
+from bitbully import BitBully, Board
+from connect4_az.game import Connect4State
+from connect4_az.mcts import MCTSConfig, run_mcts
+from connect4_az.training import load_model_from_checkpoint, resolve_device
+import numpy as np
+def board_from_state(state):
+    return Board(state.to_column_array())
+def solver_move(agent, state):
+    board = board_from_state(state)
+    scores = agent.score_all_moves(board)
+    best = max(scores.values())
+    for move in state.ordered_legal_moves():
+        if scores.get(move) == best:
+            return move, scores
+    raise RuntimeError('no move')
+def play_game(checkpoint, agent_player, simulations):
+    device = resolve_device('cuda')
+    model, _ = load_model_from_checkpoint(checkpoint, device)
+    solver = BitBully()
+    state = Connect4State()
+    history = []
+    while not state.is_terminal():
+        if state.to_play == agent_player:
+            dist, _ = run_mcts(model, state, device,
+MCTSConfig(simulations=simulations, dirichlet_epsilon=0.0), add_noise=False)
+            move = int(np.argmax(dist))
+            history.append(('agent', move + 1, state.to_play))
+        else:
+            move, scores = solver_move(solver, state)
+            history.append(('solver', move + 1, state.to_play))
+        state = state.play(move)
+    return state.winner(), history
+checkpoint = '/home/johnk/Documents/connect4/runs/oracle_fast/best.pt'
+for agent_player in (1, -1):
+    winner, history = play_game(checkpoint, agent_player=agent_player,
+simulations=4096)
+    print('agent_player', agent_player, 'winner', winner)
+    print('moves', history)
+PY
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ from bitbully import BitBully, Board
+  │ from connect4_az.game import Connect4State
+  │ … +41 lines
+  └ agent_player 1 winner 1
+    moves [('agent', 4, 1), ('solver', 4, -1), ('agent', 4, 1), ('solver', 4,
+    … +19 lines
+    ('solver', 6, 1), ('agent', 6, -1), ('solver', 6, 1), ('agent', 7, -1),
+    ('solver', 7, 1), ('agent', 2, -1), ('solver', 2, 1)]
+
+─ Worked for 1m 14s ────────────────────────────────────────────────────────────
+
+• The solver-vs-agent root test is the strongest evidence so far: with 4,096
+  search simulations, the oracle-distilled agent won from the empty board as
+  first player against the perfect solver, and lost as second player, which is
+  exactly what perfect-play theory predicts for Connect 4. I’m promoting that
+  checkpoint into runs/final/best.pt and sanity-checking the interactive wrapper
+  one last time.
+
+• Ran cp /home/johnk/Documents/connect4/runs/oracle_fast/best.pt /home/johnk/
+  │ Documents/connect4/runs/final/best.pt
+  └ (no output)
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/python - <<'PY'
+  │ import torch
+  │ payload = torch.load('/home/johnk/Documents/connect4/runs/final/best.pt',
+  │ … +3 lines
+  └ {'phase': 'final_eval', 'epoch': 16, 'train_loss': 0.5681654119262696, 'lr':
+    0.00019098300562505263, 'seconds': 16.558342218399048, 'loss':
+    … +5 lines
+    'tactical_optimal_move_rate': 1.0, 'solver_nodes': 115345605,
+    'solver_cache': 0, 'simulations': 2048}
+
+• Ran printf '4\n4\nq\n' | /home/johnk/Documents/connect4/play_friend.sh second
+  └ Connect 4
+    Human plays second.
+    … +105 lines
+    +---+---+---+---+---+---+---+
+    Choose a column (1-7):
+
+• Updated Plan
+  └ Completed training, evaluation, checkpoint selection, and interactive-play
+    validation. The strongest checkpoint has been promoted to runs/final/best.pt
+    and the play wrapper targets it.
+    ✔ Create project scaffold, exact game engine, tests, and venv with PyTorch
+      nightly CUDA 12.8
+    ✔ Implement AlphaZero components: network, MCTS, solver-guided pretraining,
+      self-play fine-tuning
+    ✔ Add interactive human-vs-agent CLI with first/second player options and
+      physical board display
+    ✔ Run monitored training/evaluation until the network+MCTS agent is near-
+      optimal
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m leaving one small breadcrumb in runs/final so it’s obvious where the
+  selected checkpoint came from and what its measured strength was. Then I’ll
+  close this out with the exact play commands and the evaluation numbers that
+  justified the selection.
+
+• Added connect4/runs/final/SELECTED_CHECKPOINT.txt (+17 -0)
+     1 +Selected checkpoint source:
+     2 +/home/johnk/Documents/connect4/runs/oracle_fast/best.pt
+     3 +
+     4 +Promoted to:
+     5 +/home/johnk/Documents/connect4/runs/final/best.pt
+     6 +
+     7 +Selection rationale:
+     8 +- exact holdout positions: 1200
+     9 +- MCTS simulations during final eval: 2048
+    10 +- mcts_optimal_move_rate: 0.9483333333333334
+    11 +- policy_optimal_move_rate: 0.9241666666666667
+    12 +- tactical_optimal_move_rate: 1.0
+    13 +- value_sign_rate: 0.8716666666666667
+    14 +
+    15 +Additional root-position check:
+    16 +- agent as first player beat the perfect solver from the empty board wit
+        h 4096 MCTS simulations
+    17 +- agent as second player lost to the perfect solver, which matches solve
+        d Connect 4 theory
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The strongest checkpoint is selected and promoted to connect4/runs/final/
+  best.pt. The selection note is in connect4/runs/final/SELECTED_CHECKPOINT.txt,
+  and the play wrapper is connect4/play_friend.sh. Final play uses the neural
+  net plus MCTS only; the exact solver was used for training and evaluation, not
+  for the returned interactive player.
+
+  Key results:
+
+  - Exact holdout eval on 1,200 random positions with 2,048 MCTS simulations:
+    mcts_optimal_move_rate = 0.9483, policy_optimal_move_rate = 0.9242,
+    tactical_optimal_move_rate = 1.0, value_sign_rate = 0.8717.
+  - Root-position check against the perfect solver with 4,096 MCTS simulations:
+    as first player, the agent beat the solver from the empty board; as second
+    player, it lost, which matches solved Connect 4 theory.
+  - Regression tests passed: 12 passed.
+
+  Use it like this:
+
+  - cd /home/johnk/Documents/connect4 && ./play_friend.sh second
+  - cd /home/johnk/Documents/connect4 && ./play_friend.sh first
+  - For a stronger but slower search: cd /home/johnk/Documents/connect4 &&
+    SIMULATIONS=4096 ./play_friend.sh second
+
+  The monitor session is still pointed at the completed oracle run in connect4/
+  runs/oracle_fast.
+
+
+› hey my friend is here so wrap it up in the next 2-3 mins please!
+
+
+• I’m cleaning up the leftover monitor process and then I’ll give you just the
+  commands you need to start the game.
+
+• Ran /home/johnk/Documents/connect4/.venv/bin/connect4-az monitor --run-dir /
+  │ home/johnk/Documents/connect4/runs/oracle_fast --refresh-seconds 5
+  └ Run dir: /home/johnk/Documents/connect4/runs/oracle_fast
+    Time: 2026-03-25 14:11:18
+    … +24075 lines
+    }
+
+
+• Ran pkill -f '/home/johnk/Documents/connect4/.venv/bin/connect4-az monitor
+  │ --run-dir /home/johnk/Documents/connect4/runs/oracle_fast' || true
+  └ (no output)
+
+• Ran pgrep -af 'connect4-az monitor|connect4-az train' || true
+  └ 102594 /home/johnk/Documents/connect4/.venv/bin/python3 /home/johnk/
+    Documents/connect4/.venv/bin/connect4-az monitor --run-dir /home/johnk/
+    … +6 lines
+    108294 pkill -f /home/johnk/Documents/connect4/.venv/bin/connect4-az monitor
+    --run-dir /home/johnk/Documents/connect4/runs/oracle_fast
+
+• Ran kill 102594
+  └ /bin/bash: line 1: kill: (102594) - No such process
+
+─ Worked for 1m 05s ────────────────────────────────────────────────────────────
+
+• Context compacted
+
+• The model is ready. Use connect4/play_friend.sh with the selected checkpoint
+  at connect4/runs/final/best.pt.
+
+  Run one of these now:
+
+  - cd /home/johnk/Documents/connect4 && ./play_friend.sh second
+  - cd /home/johnk/Documents/connect4 && ./play_friend.sh first
+  - cd /home/johnk/Documents/connect4 && SIMULATIONS=4096 ./play_friend.sh
+    second
+
+  Your friend just types 1 through 7 each move. The final player is neural net +
+  MCTS only; the exact solver was used for training/eval, not interactive play.
+
+  Strength check:
+
+  - Exact holdout eval: 0.9483 optimal-move rate on 1,200 positions at 2,048
+    sims
+  - Tactical optimal-move rate: 1.0000
+  - From the empty board, it beat the perfect solver as first player and lost as
+    second, which is consistent with solved Connect 4
+  - Tests passed: 12 passed
+
+  If you want the selection note, it’s in connect4/runs/final/
+  SELECTED_CHECKPOINT.txt.
+Token usage: total=2,917,804 input=2,839,553 (+ 10,744,320 cached) output=78,251 (reasoning 43,052)
+To continue this session, run codex resume 019d260f-c16e-7e41-ae07-ef3ddd9f961c
+johnk@rt1:~/Documents$ ls
+ 1-Mind-The-Move.pdf
+'2-A Review of Brain-Computer Interface Games.pdf'
+'39 Impact of ChatGPT on ESL students academic writing skills a mixed methods intervention study.pdf'
+'40 Short-term learning effect of ChatGPT on pharmacy students_ learning.pdf'
+ 5-BCIPy.pdf
+ Action_041525.docx
+ CHI_Poster.pptx
+ connect4
+'Copy of Agent_PRISMA.drawio'
+'Copy of Agent_PRISMA.drawio.svg'
+ Deitke.pdf
+ ea3_ch9_forms.xlsx
+ experiments
+ Fan.pdf
+ FETCH_HEAD
+ Guide_poster.docx
+ HEAD
+ Kumar.pdf
+ log.txt
+ main
+ many_people.jpeg
+ midterm_due_July_22.docx
+ ml1_ch2_prac
+ Nawwaf_Tse_Poster.jpg
+ pr.docx
+ PRISMA_1.png
+'README(1).md'
+'README(2).md'
+ README.md
+ research
+ research_notes.docx
+ resume.txt
+ s33.xlsx
+ Saharia.pdf
+ Schuhmann.pdf
+ Session_Chair.png
+ shift
+ Sorscher.pdf
+'Tips on Writing a Research Proposal.pdf'
+ transformer_results.json
+ URA_rubric.pdf
+johnk@rt1:~/Documents$ cd connect4/
+johnk@rt1:~/Documents/connect4$ ls
+logs  play_friend.sh  pyproject.toml  README.md  runs  src  tests
+johnk@rt1:~/Documents/connect4$ ./play_friend.sh second
+Connect 4
+Human plays second.
+Checkpoint summary: {"elapsed": 2368.7372159957886, "epoch": 16, "loss": 0.9068032245635986, "lr": 0.00019098300562505263, "mcts_optimal_move_rate": 0.9483333333333334, "phase": "final_eval", "policy_loss": 0.758722386264801, "policy_optimal_move_rate": 0.9241666666666667, "policy_top1": 0.9386, "positions": 1200, "seconds": 16.558342218399048, "simulations": 2048, "solver_cache": 0, "solver_nodes": 115345605, "tactical_optimal_move_rate": 1.0, "train_loss": 0.5681654119262696, "value_loss": 0.14808084137439728, "value_sign": 0.87295, "value_sign_rate": 0.8716666666666667}
+Yellow moves first. Agent is Yellow.
+Human is Red.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 4 (4:2400, 3:0, 5:0)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 4
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 4 (4:2400, 3:0, 5:0)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 4
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 4 (4:2400, 3:0, 5:0)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 4
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 5 (5:2162, 2:141, 3:89)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | O | . | . |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 6  
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | O | O | . |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 2 (2:2265, 6:67, 5:64)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | . | O | O | O | . |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 3
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | . |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 3 (3:2400, 5:0, 2:0)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | . |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 6
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | . |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 3 (3:2164, 5:230, 6:2)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | . |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 6     
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | . |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 6 (6:2400, 3:0, 5:0)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | . |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 7
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 7 (7:2398, 3:1, 2:1)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 6
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 6 (6:1229, 7:1057, 1:61)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 1
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 1 (1:966, 7:789, 3:635)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 7
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 1 (1:2001, 7:229, 3:150)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 3
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 3 (3:2379, 1:14, 7:4)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 7
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 7 (7:1211, 1:910, 3:276)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | . |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 7
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | O | . | O | O |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 3 (3:1254, 1:1129, 2:16)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 1
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 2 (2:1339, 1:1059, 5:2)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 2
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 2 (2:2399, 5:1, 1:0)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 2
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 2 (2:1688, 1:711, 5:1)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 1
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 1 (1:2388, 5:12)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 5
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 5 (5:2400)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 5
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Agent is thinking...
+Agent plays column 5 (5:2400)
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| O | O | O | O | . | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 5
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| O | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Draw.
+johnk@rt1:~/Documents/connect4$ 
+

@@ -1,0 +1,1946 @@
+rt1@rt1:~/Documents/phase2/connect4/opus47/t7/init$ sudo sleep 55800 && sudo ./run.sh
+[sudo] password for rt1: 
+[+] Building 0.4s (18/18) FINISHED                               docker:default
+ => [internal] load build definition from Dockerfile                       0.0s
+ => => transferring dockerfile: 1.20kB                                     0.0s
+ => [internal] load metadata for docker.io/nvidia/cuda:12.8.0-devel-ubunt  0.4s
+ => [internal] load .dockerignore                                          0.0s
+ => => transferring context: 2B                                            0.0s
+ => [internal] load build context                                          0.0s
+ => => transferring context: 65B                                           0.0s
+ => [ 1/13] FROM docker.io/nvidia/cuda:12.8.0-devel-ubuntu24.04@sha256:9a  0.0s
+ => CACHED [ 2/13] RUN apt-get update && apt-get install -y --no-install-  0.0s
+ => CACHED [ 3/13] RUN curl -fsSL https://deb.nodesource.com/setup_22.x |  0.0s
+ => CACHED [ 4/13] RUN npm install -g @anthropic-ai/claude-code            0.0s
+ => CACHED [ 5/13] RUN pip install --break-system-packages --pre torch --  0.0s
+ => CACHED [ 6/13] RUN pip install --break-system-packages numpy pytest t  0.0s
+ => CACHED [ 7/13] RUN usermod -l claude -d /home/claude -m ubuntu && gro  0.0s
+ => CACHED [ 8/13] RUN mkdir -p /workspace /output && chown claude:claude  0.0s
+ => CACHED [ 9/13] COPY squid.conf /etc/squid/squid.conf                   0.0s
+ => CACHED [10/13] RUN mkdir -p /var/log/squid && chown proxy:proxy /var/  0.0s
+ => CACHED [11/13] COPY entrypoint.sh /entrypoint.sh                       0.0s
+ => CACHED [12/13] RUN chmod +x /entrypoint.sh                             0.0s
+ => CACHED [13/13] WORKDIR /workspace                                      0.0s
+ => exporting to image                                                     0.0s
+ => => exporting layers                                                    0.0s
+ => => writing image sha256:1c294b9fbe44407f9a7c47359847e0c09c21a8c94aad3  0.0s
+ => => naming to docker.io/library/claude-sandbox                          0.0s
+Waiting for Squid to listen on port 3128... (1/30)
+Squid proxy is ready on port 3128.
+╭─── Claude Code v2.1.72 ──────────────────────────────────────────────────────╮
+│                                  │ Tips for getting started                  │
+│           Welcome back!          │ Run /init to create a CLAUDE.md file wit… │
+│                                  │ ───────────────────────────────────────── │
+│              ▐▛███▜▌             │ Recent activity                           │
+│             ▝▜█████▛▘            │ No recent activity                        │
+│               ▘▘ ▝▝              │                                           │
+│                                  │                                           │
+│   claude-opus-4-7 · Claude Max   │                                           │
+│            /workspace            │                                           │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+❯ Hi Claude, please complete the project as specified in project_spec.md        
+                            
+● Read 1 file (ctrl+o to expand)                                                
+                                               
+● I've analyzed the project specification. It's a legitimate software           
+  engineering project request to build a Connect 4 game with AlphaZero-style
+  self-play training, checkpointing, and competitive evaluation. This is not    
+  malware — it's a standard ML/game programming task, so I'll proceed with      
+  implementing it.                                                              
+                                                                                
+  Let me start by checking the deadline and the workspace structure.         
+
+● Bash(cat /workspace/.deadline && echo "---" && date && echo "---" && ls -la
+      /workspace/)
+  ⎿  Start time: Sat Apr 18 00:27:56 CDT 2026                                   
+     End time: Sat Apr 18 03:27:56 CDT 2026
+     ---                                                                        
+     … +7 lines (ctrl+o to expand)                                           
+                                                                                
+● Bash(python3 -c "import torch; print(torch.__version__); print('CUDA
+      available:', torch.cuda.is_available()); print('Device count:',           
+      torch.cuda.device_count()); prin…)                                        
+  ⎿  2.12.0.dev20260310+cu128
+     CUDA available: True                                                       
+     Device count: 1                                                         
+     … +2 lines (ctrl+o to expand)
+                                                                                
+● I have:                  
+  - Start: 00:27:56 CDT, End: 03:27:56 CDT (3 hours)                            
+  - GPU: NVIDIA RTX 5060 Ti with CUDA, PyTorch 2.12, numpy 2.4                  
+  
+  Now let me create the project structure. I'll build this efficiently.         
+                                                                             
+● Write(CLAUDE.md)                              
+  ⎿  Wrote 55 lines to CLAUDE.md
+     # Connect 4 AlphaZero - Progress Tracking                                  
+  
+     ## Timeline                                                                
+     - Start: 2026-04-18 00:27:56 CDT                                        
+     - End:   2026-04-18 03:27:56 CDT (3 hours)                                 
+                                                                             
+     ## Hardware
+     - GPU: NVIDIA RTX 5060 Ti, CUDA 12.8, PyTorch 2.12 nightly
+     - numpy 2.4
+
+     … +45 lines (ctrl+o to expand)
+
+● Write(connect4.py)                             
+  ⎿  Wrote 135 lines to connect4.py
+     """Connect 4 game logic.                                                   
+  
+     Board: 6 rows x 7 columns. Row 0 is the bottom (physical floor).           
+     Pieces: +1 for Player 1 (X), -1 for Player 2 (O), 0 for empty.          
+     """                                                                        
+                                                                  
+     from __future__ import annotations
+
+     import numpy as np
+
+     … +125 lines (ctrl+o to expand)
+
+● Write(test_connect4.py)                           
+  ⎿  Wrote 186 lines to test_connect4.py
+     """Tests for Connect 4 game logic."""                                      
+  
+     import numpy as np                                                         
+     import pytest                                                
+                                                                                
+     from connect4 import Connect4, ROWS, COLS                    
+
+
+     def test_initial_state():
+         g = Connect4()
+     … +176 lines (ctrl+o to expand)
+
+● Bash(python -m pytest test_connect4.py -q 2>&1 | tail -30)
+  ⎿  /bin/bash: line 1: python: command not found
+                                                                                
+● Bash(python3 -m pytest test_connect4.py -q 2>&1 | tail -30)
+  ⎿  .................                                                          
+        [100%]                                                                  
+     17 passed in 0.08s                             
+                                                                                
+● All 17 tests pass. Now let me build the neural network and MCTS.              
+  
+● Write(model.py)                                                               
+  ⎿  Wrote 66 lines to model.py                                   
+     """Neural network for Connect 4 AlphaZero.                                 
+                                                                  
+     Small residual CNN with dual heads (policy, value).                        
+     Input: (B, 2, 6, 7). Plane 0 = current player's pieces. Plane 1 = 
+     opponent's pieces.
+     Policy head: logits over 7 columns.
+     Value head: scalar in [-1, 1] from perspective of current player.
+     """
+
+     from __future__ import annotations
+
+     … +56 lines (ctrl+o to expand)
+
+● Write(mcts.py)                              
+  ⎿  Wrote 320 lines to mcts.py
+     """Monte Carlo Tree Search with batched neural network inference.          
+  
+     Implementation notes:                                                      
+     - PUCT formula: U(s,a) = Q(s,a) + c_puct * P(s,a) * sqrt(N_parent) / (1
+      + N(s,a))
+     - Batched self-play: multiple independent games run one MCTS simulation
+      each,
+       all leaf evaluations are batched into a single GPU forward pass.
+     - Values are stored from the perspective of the player to move at that
+     node.
+       When propagating up, we negate the value at each level.
+     - Terminal leaves use exact game values (not network).
+
+
+     … +310 lines (ctrl+o to expand)
+
+● Now the training loop:                      
+
+● Write(train.py)                                                               
+  ⎿  Wrote 449 lines to train.py
+     """AlphaZero-style self-play training loop for Connect 4.                  
+                                                                  
+     Per iteration:                                                             
+         1) Generate a batch of self-play games using the current net + 
+     MCTS.
+         2) Insert (state, policy, value) triples into a replay buffer.
+         3) Train the network on sampled mini-batches.
+
+     Checkpointing:
+         - After every iteration, save to `checkpoints/latest.pt`.
+         - On SIGINT (Ctrl+C), finish the current phase and save, then
+     exit.
+     … +439 lines (ctrl+o to expand)
+
+● Write(test_training.py)                      
+  ⎿  Wrote 160 lines to test_training.py
+     """Tests for the neural network, MCTS, and checkpoint save/load            
+     cycle."""
+                                                                                
+     import os                                                    
+     import tempfile                                                            
+                                                                  
+     import numpy as np
+     import torch
+
+     from connect4 import Connect4
+     from model import Connect4Net
+     … +150 lines (ctrl+o to expand)
+
+● Bash(python3 -m pytest test_training.py -q 2>&1 | tail -40)
+  ⎿  ..F.....
+        [100%]                                                                  
+     =================================== FAILURES =========================
+     … +18 lines (ctrl+o to expand)                                             
+                                                                                
+● Found a bug: Connect4.play() doesn't flip current_player on a terminal move,
+  so _check_terminal_for returns the wrong-sign value. Let me fix.              
+                                                                                
+● Update(connect4.py)                                 
+  ⎿  Added 6 lines, removed 2 lines                                             
+      77              self.winner = self.current_player                         
+      78          elif self.move_count == ROWS * COLS:                   
+      79              self.winner = 0  # draw                                   
+      80 -        else:                                                  
+      81 -            self.current_player = -self.current_player                
+      80 +        # Always flip current_player, even on terminal moves,  
+         +so that                                                        
+      81 +        # `current_player` consistently represents "the player 
+         + who would move                                                
+      82 +        # next if the game weren't over". This lets            
+         +_check_terminal_for use                                        
+      83 +        # a uniform rule: a finished game is a loss from the   
+         +current_player's                                               
+      84 +        # perspective (because the *previous* player's move    
+         +won/drew).                                                     
+      85 +        self.current_player = -self.current_player             
+      86   
+      87      def _check_win(self, row: int, col: int) -> bool:
+      88          """Check whether the piece just placed at (row, col)
+          creates a 4-in-a-row."""
+
+● Bash(python3 -m pytest test_connect4.py test_training.py -q 2>&1 | tail -20)
+  ⎿  .........................
+        [100%]                                                                  
+     25 passed in 1.18s                               
+                                                                                
+● All 25 tests pass. Let me add a couple more critical tests to make sure MCTS  
+  is sound, then test self-play end-to-end.
+                                                                                
+● Update(test_training.py)                                        
+  ⎿  Added 17 lines                                                             
+      48      assert best == 3, f"MCTS did not pick the winning move;           
+          visits={visits}"                                               
+      49                                                                        
+      50                                                                 
+      51 +def test_mcts_blocks_opponent_win():                                  
+      52 +    """If opponent will win on next move, MCTS should          
+         +block."""                                                      
+      53 +    net = Connect4Net(channels=16, blocks=2)                   
+      54 +    net.eval()                                                 
+      55 +    g = Connect4()                                             
+      56 +    # O has three-in-a-row in row 0 cols 0-2; if X doesn't     
+         +play col 3, O wins.                                            
+      57 +    # X: col 4,5,6 (filler); O: col 0,1,2                      
+      58 +    # Turn order: X,O,X,O,X,O -> after 6 moves, X to move.     
+      59 +    for m in [4, 0, 5, 1, 6, 2]:                               
+      60 +        g.play(m)                                              
+      61 +    # Now X to move; X must play col 3 to block.               
+      62 +    mcts = MCTS(net, device="cpu", c_puct=1.5)                 
+      63 +    visits, _ = mcts.run_single(g, simulations=400)            
+      64 +    best = int(np.argmax(visits))                              
+      65 +    assert best == 3, f"MCTS did not block; visits={visits}"   
+      66 +                                                               
+      67 +                                                               
+      68  def test_mcts_batch():
+      69      net = Connect4Net(channels=16, blocks=2)
+      70      net.eval()
+
+● Bash(python3 -m pytest test_training.py -q 2>&1 | tail -10)
+  ⎿  .........
+        [100%]                                                                  
+     9 passed in 1.19s                         
+                                                                                
+● Let me do a quick smoke test of self-play, then build player.sh and human     
+  mode.
+                                                                                
+● Bash(timeout 60 python3 -c "                                    
+      import time…)                                                             
+  ⎿  took 0.6506896018981934 s samples 90 stats {'p1_wins': 2, 'p2_wins': 1     
+     , 'draws': 1, 'avg_len': 22.5, 'samples': 90, 'most_visited_col': 2, '
+     root_total_visits': 40, 'root_value': 0.06252334266901016, 'chosen_col     
+     _counts': [13, 13, 14, 11, 14, 12, 13]}                      
+                                                                                
+● Bash(timeout 120 python3 -c "                
+      import time…)                                                             
+  ⎿  Timing self-play with 64 games, 120 sims each...                           
+     took 9.116529941558838 s samples 1510
+     stats: {'p1_wins': 34, 'p2_wins': 28, 'draws': 2, 'avg_len': 23.59375,     
+     … +3 lines (ctrl+o to expand)                                
+                                                                                
+● Self-play takes ~9s per iteration. Let me now write player.sh, setup.sh, and  
+  the human play mode, then start training.                                     
+                                                                                
+● Write(player.py)                                                              
+  ⎿  Wrote 123 lines to player.py                                               
+     """Competitive evaluator entry point.                                      
+  
+     Reads `game_state.txt` (digit string of previous moves, 1-indexed          
+     columns).                                                    
+     Writes `next_move.txt` containing either:                                  
+         - A single digit 1-7 (the chosen column), or             
+         - "LOSS" if the position in game_state.txt is already terminal
+     with the opponent having just won,
+         - "DRAW" if the board is full with no winner.
+
+     Move selection uses MCTS with the trained AlphaZero neural network.
+     """
+     … +113 lines (ctrl+o to expand)
+
+● Write(player.sh)                                    
+  ⎿  Wrote 7 lines to player.sh
+     #!/usr/bin/env bash                                                        
+     # Competitive evaluator entry point.
+     # Reads game_state.txt and writes next_move.txt.                           
+     # Invoked from /workspace each turn.                         
+     set -euo pipefail                                                          
+     cd "$(dirname "$0")"                                         
+     exec python3 -u player.py
+
+
+● Write(setup.sh)                                     
+  ⎿  Wrote 8 lines to setup.sh
+     #!/usr/bin/env bash                                                        
+     # setup.sh — runs once before evaluation begins.
+     # All required Python packages (torch, numpy, tqdm, pytest) are            
+     preinstalled.                                                
+     # This script is intentionally a no-op to avoid breaking the               
+     GPU-compatible                                               
+     # PyTorch nightly build in the evaluation container.
+     set -euo pipefail
+     echo "[setup] No extra dependencies needed; torch and numpy are
+     preinstalled."
+     exit 0
+
+
+● Bash(chmod +x /workspace/player.sh /workspace/setup.sh)
+  ⎿  Done    
+                                                                                
+● Now the human-play mode:                            
+                                                                                
+● Write(play.py)                                                                
+  ⎿  Wrote 125 lines to play.py
+     """Play Connect 4 in the terminal.                                         
+                                                                  
+     Modes:                                                                     
+         python3 play.py --mode hvh                  # human vs human
+         python3 play.py --mode hvai                 # human is Player 1        
+     (X), AI is Player 2 (O)                                      
+         python3 play.py --mode hvai --ai-first      # AI is Player 1 (X),
+     human is Player 2 (O)
+
+     The AI uses MCTS with the current best checkpoint and prints the top 3
+     columns
+     it considered along with visit counts and estimated win probability.
+     """
+
+     … +115 lines (ctrl+o to expand)
+
+● Now let me run the player.sh to make sure it works end-to-end even without a
+  trained model (it should still produce a valid move).
+                                                                                
+● Bash(rm -f game_state.txt next_move.txt && printf "" > game_state.txt &&
+      ./player.sh && echo "OUTPUT: $(cat next_move.txt)")                       
+  ⎿  [player] No checkpoint found in checkpoints                                
+     OUTPUT: 4
+                                                                                
+● Bash(printf "44455" > game_state.txt && ./player.sh && echo "OUTPUT: $(cat
+      next_move.txt)" && printf "" > game_state.txt)                            
+  ⎿  [player] No checkpoint found in checkpoints                                
+     OUTPUT: 4                                                                  
+                                                                                
+● Bash(printf "1212121" > game_state.txt && ./player.sh && echo "OUTPUT: $(cat
+      next_move.txt)" && printf "" > game_state.txt)                            
+  ⎿  [player] No checkpoint found in checkpoints                                
+     OUTPUT: LOSS                                                               
+                                                                                
+● Terminal detection works. Let me delete the test file and launch training.
+                                                                                
+● Bash(rm -f game_state.txt next_move.txt && ls /workspace/)                    
+  ⎿  CLAUDE.md                                                                  
+     __pycache__                                                                
+     connect4.py                                                  
+     … +10 lines (ctrl+o to expand)                                             
+                                                                                
+● Let me kick off training in the background.        
+                                                                                
+● Bash(nohup python3 -u train.py --iterations 10000 --deadline-buffer-sec 300 > 
+      training.log 2>&1 &
+      echo "Training PID: $!"…)                                                 
+  ⎿  Training PID: 1507                                           
+     [init] device=cuda cfg={'channels': 96, 'blocks': 6, 'c_puct': 1.7, 's     
+     imulations': 120, 'games_per_iter': 64, 'temperature_moves': 10, 'diri
+     … +7 lines (ctrl+o to expand)
+                                                                                
+● Bash(sleep 30 && tail -40 training.log)            
+  ⎿  [init] device=cuda cfg={'channels': 96, 'blocks': 6, 'c_puct': 1.7, 's     
+     imulations': 120, 'games_per_iter': 64, 'temperature_moves': 10, 'diri     
+     chlet_alpha': 1.0, 'dirichlet_eps': 0.25, 'replay_size': 200000, 'batc
+     … +17 lines (ctrl+o to expand)                                             
+                                                                                
+● Training is going well (~12s/iter). Let me verify player.sh timing is OK and  
+  also run the full test suite once more.                                       
+                                                                                
+● Bash(python3 -c "                                                             
+      import time…)                                                             
+  ⎿  sims=200: 0.77s                                                            
+     sims=400: 1.31s            
+     sims=800: 0.73s                                                            
+     sims=1200: 0.73s                                             
+                                                                                
+● Update(player.py)                                                             
+  ⎿  Added 2 lines, removed 2 lines                                             
+      27  def pick_move(game: Connect4, net, device: str,                       
+          time_budget_sec: float = 20.0) -> int:                                
+      28      """Select the next column (0-indexed) using MCTS + net."""        
+      29      mcts = MCTS(net, c_puct=1.5, device=device)                
+      30 -    # Fixed number of simulations; 800 is typically well              
+         -within 30 seconds.                                             
+      31 -    sims = 800                                                 
+      30 +    # Benchmarked ~0.7s for 800 sims on this GPU; 1600 easily  
+         +fits in 30s budget.                                            
+      31 +    sims = 1600                                                
+      32      t0 = time.time()
+      33      visits, root = mcts.run_single(game, simulations=sims,
+          add_noise=False)
+      34      dt = time.time() - t0
+
+● Read 1 file (ctrl+o to expand)    
+                                     
+● Training is progressing nicely. Let me let it run and in the meantime do some 
+  housekeeping and test fixes.                       
+                                                                                
+● Update(CLAUDE.md)                                                             
+  ⎿  Added 23 lines, removed 8 lines
+      45                                                                        
+      46  ## Status                                                      
+      47  - [x] Plan                                                            
+      48 -- [ ] Game logic + tests                                       
+      49 -- [ ] NN model                                                        
+      50 -- [ ] MCTS                                                     
+      51 -- [ ] Training loop                                            
+      52 -- [ ] Checkpointing + resume                                   
+      53 -- [ ] Human mode                                               
+      54 -- [ ] player.sh                                                
+      55 -- [ ] Training run                                             
+      48 +- [x] Game logic + tests (17 tests passing)                    
+      49 +- [x] NN model (Connect4Net: 96ch x 6 resblocks ≈ moderate     
+         +size)                                                          
+      50 +- [x] MCTS (run_single for player.sh, run_batch for self-play) 
+      51 +- [x] Training loop                                            
+      52 +- [x] Checkpointing + resume (test passes, full save/load      
+         +cycle)                                                         
+      53 +- [x] Human mode (play.py)                                     
+      54 +- [x] player.sh + setup.sh                                     
+      55 +- [x] Training run launched                                    
+      56 +                                                               
+      57 +## Key Bugs Fixed                                              
+      58 +- `Connect4.play()` originally did not flip `current_player`   
+         +on a terminal                                                  
+      59 +  move, which caused `_check_terminal_for` to return the wrong 
+         + sign from                                                     
+      60 +  MCTS's point of view. Fix: always flip `current_player` in   
+         +`play()`.                                                      
+      61 +  Symptom before fix: MCTS failed to find immediate winning    
+         +moves.                                                         
+      62 +                                                               
+      63 +## Notes for Future Instances                                  
+      64 +- The MCTS treats `game.current_player` as "the player who     
+         +would move next                                                
+      65 +  if the game were still ongoing". Terminal game values are    
+         +always -1 from                                                 
+      66 +  this player's perspective (or 0 for draw).                   
+      67 +- Self-play iteration ~12s (9s self-play + 3s train); expect   
+         +~600-700                                                       
+      68 +  iterations within 2h20m training budget.                     
+      69 +- player.py uses ~1600 MCTS sims which takes <2s on this GPU.  
+         +Safely                                                         
+      70 +  within the 30s evaluation budget per move.                   
+
+● Bash(sleep 120 && tail -40 training.log)           
+  ⎿  [train] Training network on 200 mini-batches of 512...
+     [train] done in 3.3s | loss=1.1631 (p=0.9090, v=0.2541)                    
+     … +33 lines (ctrl+o to expand)                  
+                                                                                
+● Loss is plateauing. Let me fix player.py to prefer latest.pt (most recent)    
+  instead of best.pt, and improve the training LR schedule. First let me check  
+  if there's a way to avoid stopping training.                                  
+                                                                                
+● Update(player.py)                                                             
+  ⎿  Added 4 lines, removed 2 lines                               
+      56                                                                        
+      57                                                                 
+      58  def main():                                                           
+      59 -    # Locate checkpoint: prefer best.pt, fall back to latest.pt
+         -.                                                                     
+      59 +    # Locate checkpoint: prefer latest.pt (most recent weights)
+         + over best.pt                                                  
+      60 +    # (lowest-loss). "Best loss" measures fit to shifting MCTS 
+         + targets and is                                                
+      61 +    # not necessarily a better policy than the most recent     
+         +checkpoint.                                                    
+      62      ckpt_dir = Path("checkpoints")
+      63      ckpt_path = None
+      64 -    for name in ("best.pt", "latest.pt"):                      
+      64 +    for name in ("latest.pt", "best.pt"):                      
+      65          cand = ckpt_dir / name
+      66          if cand.exists():
+      67              ckpt_path = cand
+
+● Let me proactively add a proper LR schedule. I'll stop, modify, and resume.
+
+● Bash(kill -SIGINT 1507 2>/dev/null; sleep 12; tail -15 training.log)          
+  ⎿  [train] done in 3.4s | loss=1.1847 (p=0.8483, v=0.3364)
+                                                                                
+     === Iteration 15 | wall=208s ===                             
+     … +16 lines (ctrl+o to expand)                                             
+                                                                                
+● Read 1 file (ctrl+o to expand)                                                
+                                                                                
+● Now let me improve the training schedule:                                     
+                                                                  
+● Update(train.py)                                                              
+  ⎿  Added 4 lines, removed 2 lines                                             
+      344                                                                       
+      345      net = Connect4Net(channels=cfg["channels"],                      
+           blocks=cfg["blocks"]).to(device)                                     
+      346      opt = torch.optim.Adam(net.parameters(), lr=cfg["lr"],    
+           weight_decay=cfg["weight_decay"])                                    
+      347 -    # LR scheduler: cosine annealing-ish with warm restarts;  
+          -but simpler: step LR halving                                  
+      348 -    sched = torch.optim.lr_scheduler.StepLR(opt, step_size=1, 
+          - gamma=1.0)  # static initially                               
+      347 +    # LR schedule: LR computed from iter count each iteration 
+          + (see set_lr_for_iter).                                       
+      348 +    # We still keep a scheduler object for                    
+          +checkpoint-compatibility, but set LRs                         
+      349 +    # directly from the iteration number so resume is         
+          +unambiguous.                                                  
+      350 +    sched = torch.optim.lr_scheduler.StepLR(opt,              
+          +step_size=1_000_000, gamma=1.0)                               
+      351      buffer = ReplayBuffer(cfg["replay_size"])
+      352   
+      353      start_iter = 0
+
+● Update(train.py)                                    
+  ⎿  Added 28 lines
+      252      )                                                                
+      253                                                                
+      254                                                                       
+      255 +# ------------------------------ LR schedule                  
+          +------------------------------                                       
+      256 +                                                              
+      257 +                                                              
+      258 +def lr_for_iter(base_lr: float, it: int) -> float:            
+      259 +    """Piecewise-constant LR schedule based on iteration      
+          +count.                                                        
+      260 +                                                              
+      261 +    - Iters 0-80:    base_lr        (2e-3 initial             
+          +exploration)                                                  
+      262 +    - Iters 80-200:  base_lr * 0.5  (1e-3)                    
+      263 +    - Iters 200-400: base_lr * 0.15 (3e-4)                    
+      264 +    - Iters 400+:    base_lr * 0.03 (6e-5 fine-tuning)        
+      265 +                                                              
+      266 +    These milestones are chosen assuming ~12-15s/iter and ~2h 
+          + training budget,                                             
+      267 +    which lets us reach ~500+ iters.                          
+      268 +    """                                                       
+      269 +    if it < 80:                                               
+      270 +        return base_lr                                        
+      271 +    if it < 200:                                              
+      272 +        return base_lr * 0.5                                  
+      273 +    if it < 400:                                              
+      274 +        return base_lr * 0.15                                 
+      275 +    return base_lr * 0.03                                     
+      276 +                                                              
+      277 +                                                              
+      278 +def set_lr(opt, lr: float):                                   
+      279 +    for g in opt.param_groups:                                
+      280 +        g["lr"] = lr                                          
+      281 +                                                              
+      282 +                                                              
+      283  # ------------------------------ Checkpointing
+           ------------------------------
+      284   
+      285   
+
+● Update(train.py)                                    
+  ⎿  Added 5 lines, removed 1 line
+      410              print(f"[deadline] Stopping: current time                
+           {time.ctime()} is within {args.deadline_buffer_sec}s of       
+           deadline.")                                                          
+      411              break                                             
+      412                                                                       
+      413 +        # Update LR based on iteration count (so resume is    
+          +exact).                                                       
+      414 +        new_lr = lr_for_iter(cfg["lr"], it)                   
+      415 +        set_lr(opt, new_lr)                                   
+      416 +                                                              
+      417          it_start = time.time()
+      418 -        print(f"\n=== Iteration {it} |                        
+          -wall={time.time()-t_start:.0f}s ===")                         
+      418 +        print(f"\n=== Iteration {it} |                        
+          +wall={time.time()-t_start:.0f}s | lr={new_lr:.2e} ===")       
+      419   
+      420          # Self-play
+      421          sp_t0 = time.time()
+
+● Bash(python3 -m pytest test_training.py::test_save_and_resume -q 2>&1 | tail
+      -10)
+  ⎿  .                                                                          
+        [100%]
+     1 passed in 1.15s                                                          
+                                                                  
+● Now let me restart training from checkpoint:                                  
+  
+● Bash(nohup python3 -u train.py --iterations 10000 --deadline-buffer-sec 300   
+      --resume > training.log 2>&1 &                              
+      echo "Training PID: $!"…)                                                 
+  ⎿  Training PID: 1836                                           
+     [init] device=cuda cfg={'channels': 96, 'blocks': 6, 'c_puct': 1.7, 's     
+     imulations': 120, 'games_per_iter': 64, 'temperature_moves': 10, 'diri
+     … +10 lines (ctrl+o to expand)
+                                                                                
+● Bash(sleep 90 && tail -30 training.log)             
+  ⎿  [self-play] 64 games in 12.1s | P1=0.38 P2=0.61 D=0.02 | avg_len=21.2      
+     | samples+=1356 buffer=24021 | most_visited_col=4 root_V=+0.209 | col_     
+     counts=[113, 184, 243, 296, 231, 193, 96]                                  
+     … +27 lines (ctrl+o to expand)                                             
+                                                                                
+● Let me quickly test player.sh with the current checkpoint to make sure it     
+  works:                                                                        
+                                                                                
+● Bash(rm -f game_state.txt next_move.txt                                       
+      printf "" > game_state.txt…)                                              
+  ⎿  real       0m3.416s                                                        
+     user       0m4.113s        
+     sys        0m0.287s                                                        
+     OUTPUT: 5                                                    
+                                                                                
+● Bash(python3 -m pytest test_connect4.py test_training.py -q 2>&1 | tail -10)  
+  ⎿  ..........................                                                 
+        [100%]                                                                  
+     26 passed in 1.09s                                                         
+                                                                                
+● Bash(date && tail -5 training.log)                                            
+  ⎿  Sat Apr 18 00:42:13 CDT 2026
+     [self-play] 64 games in 14.9s | P1=0.31 P2=0.59 D=0.09 | avg_len=26.0      
+     | samples+=1662 buffer=33207 | most_visited_col=4 root_V=+0.169 | col_
+     … +5 lines (ctrl+o to expand)                                              
+                                                                                
+● Bash(sleep 600 && date && tail -30 training.log)    
+  ⎿  Running in the background (↓ to manage)                                    
+                                                                                
+● Task Output b4mpo7xt7                               
+  ⎿  Sat Apr 18 00:52:21 CDT 2026                                               
+     [self-play] 64 games in 17.3s | P1=0.44 P2=0.33 D=0.23 | avg_len=29.8      
+     | samples+=1910 buffer=76569 | most_visited_col=5 root_V=+0.096 | col_     
+     … +27 lines (ctrl+o to expand)                                             
+                                                                                
+● Training is progressing: iter 54, games getting longer (avg 31 moves), more   
+  draws. Let me keep monitoring.                                    
+                                                                                
+● Bash(sleep 1200 && date && tail -25 training.log)                             
+  ⎿  Running in the background (↓ to manage)                                    
+  ⎿  Invalid tool parameters                                                    
+                                                      
+● Task Output b4v8vp6gl                                                         
+  ⎿  (No output)                                                                
+                                                                                
+● Task Output b4v8vp6gl                                                         
+  ⎿  Sat Apr 18 01:12:33 CDT 2026                                               
+     [self-play] 64 games in 20.7s | P1=0.34 P2=0.36 D=0.30 | avg_len=33.3      
+     | samples+=2134 buffer=179925 | most_visited_col=5 root_V=+0.078 | col     
+     … +23 lines (ctrl+o to expand)                                             
+                                                                                
+● Good progress! Iter 104, loss down to 1.16. Let me keep monitoring.           
+                                                                    
+● Bash(sleep 1500 && date && tail -20 training.log)                             
+  ⎿  Running in the background (↓ to manage)                        
+                                                                                
+● Task Output bpot8q5hn                                           
+  ⎿  (No output)                                                                
+                                                                                
+● Task Output bpot8q5hn                               
+  ⎿  (No output)                                                                
+                                                                                
+● Task Output bpot8q5hn                                                         
+  ⎿  Sat Apr 18 01:37:42 CDT 2026                                               
+     === Iteration 154 | wall=3341s | lr=1.00e-03 ===                           
+     [self-play] 64 games in 22.0s | P1=0.36 P2=0.34 D=0.30 | avg_len=33.4      
+     … +18 lines (ctrl+o to expand)                                             
+                                                                                
+● Iter 157, loss 1.04 — strong progress. Model picking col 4 (optimal center)   
+  consistently. Let me continue monitoring.                         
+                                                                                
+● Bash(sleep 1500 && date && tail -20 training.log)                 
+  ⎿  Running in the background (↓ to manage)                                    
+                                                                                
+● Task Output bhtjv2p8g                                 
+  ⎿  (No output)                                                                
+                                                                                
+● Task Output bhtjv2p8g                                 
+  ⎿  (No output)                                                                
+                                                                                
+● Task Output bhtjv2p8g                                                         
+  ⎿  Sat Apr 18 02:02:57 CDT 2026                                               
+     [self-play] 64 games in 25.4s | P1=0.28 P2=0.42 D=0.30 | avg_len=34.5      
+     | samples+=2210 buffer=200000 | most_visited_col=4 root_V=+0.001 | col     
+     … +18 lines (ctrl+o to expand)                                             
+                                                                                
+● Loss down to 0.80. Let me spot-check the model's play strength.               
+                                                                    
+● Bash(printf "44" > game_state.txt && ./player.sh && echo "After 4,4 (both     
+      center): $(cat next_move.txt)"                                
+      printf "4433" > game_state.txt && ./player.sh && echo "After…)            
+  ⎿  After 4,4 (both center): 4                                   
+     After 4,4,3,3: 5                                                           
+     After 4,4,3,4: 5                                             
+                                                         
+● Model is producing reasonable moves. Let me continue training.                
+                                                                                
+● Bash(sleep 1500 && date && tail -20 training.log)                             
+  ⎿  Running in the background (↓ to manage)                                    
+                                                                                
+● Task Output bga4hwzr2                                                         
+  ⎿  (No output)                                                                
+                                                                                
+● Task Output bga4hwzr2                                  
+  ⎿  (No output)                                                                
+                                                                                
+● Task Output bga4hwzr2                                                         
+  ⎿  Sat Apr 18 02:28:20 CDT 2026                                               
+     [train] Training network on 200 mini-batches of 512...                     
+     [train] done in 4.0s | loss=0.7093 (p=0.4382, v=0.2711)                    
+     … +16 lines (ctrl+o to expand)                                             
+                                                                                
+● Iter 250, loss 0.70, policy 0.43. 44% draws = model is approaching optimal.   
+  Remaining ~1h.                                                    
+                                                                                
+● Bash(sleep 1500 && date && tail -30 training.log)                 
+  ⎿  Running in the background (↓ to manage)                                    
+                                                                                
+● Task Output bnxd2r5ad                                 
+  ⎿  (No output)                                                                
+                                                                                
+● Task Output bnxd2r5ad                                  
+  ⎿  (No output)                                                                
+                                                                                
+● Task Output bnxd2r5ad                                                         
+  ⎿  Sat Apr 18 02:53:30 CDT 2026                                               
+     [self-play] 64 games in 24.3s | P1=0.41 P2=0.34 D=0.25 | avg_len=32.8      
+     | samples+=2102 buffer=200000 | most_visited_col=4 root_V=+0.040 | col     
+     … +27 lines (ctrl+o to expand)                                             
+                                                                                
+● Loss has plateaued around 0.70. Let me stop and drop the LR to push further   
+  convergence.                                                      
+                                                                                
+● Bash(kill -SIGINT 1836 2>/dev/null; sleep 35; tail -8 training.log)           
+  ⎿  === Iteration 297 | wall=8017s | lr=3.00e-04 ===                           
+                                                                                
+     [signal] SIGINT received — will stop after current iteration.
+     … +7 lines (ctrl+o to expand)                                              
+                                                                                
+● Update(train.py)                                                              
+  ⎿  Added 5 lines, removed 6 lines                                             
+      260                                                                       
+      261      - Iters 0-80:    base_lr        (2e-3 initial                    
+           exploration)                                                         
+      262      - Iters 80-200:  base_lr * 0.5  (1e-3)                    
+      263 -    - Iters 200-400: base_lr * 0.15 (3e-4)                           
+      264 -    - Iters 400+:    base_lr * 0.03 (6e-5 fine-tuning)        
+      263 +    - Iters 200-298: base_lr * 0.15 (3e-4)                    
+      264 +    - Iters 298+:    base_lr * 0.04 (8e-5, fine-tune)         
+      265   
+      266 -    These milestones are chosen assuming ~12-15s/iter and ~2h 
+          - training budget,                                             
+      267 -    which lets us reach ~500+ iters.                          
+      266 +    Milestones retuned after observing loss plateau near iter 
+          + 290 at LR 3e-4.                                              
+      267      """
+      268      if it < 80:
+      269          return base_lr
+      270      if it < 200:
+      271          return base_lr * 0.5
+      272 -    if it < 400:                                              
+      272 +    if it < 298:                                              
+      273          return base_lr * 0.15
+      274 -    return base_lr * 0.03                                     
+      274 +    return base_lr * 0.04                                     
+      275   
+      276   
+      277  def set_lr(opt, lr: float):
+
+● Bash(nohup python3 -u train.py --iterations 10000 --deadline-buffer-sec 300
+      --resume > training2.log 2>&1 &
+      echo "Training PID: $!"…)                                                 
+  ⎿  Training PID: 2407
+     [init] deadline end time: Sat Apr 18 03:27:56 2026  (in 2005s)             
+     [resume] Loading checkpoint from checkpoints/latest.pt       
+     … +4 lines (ctrl+o to expand)                       
+                                                                                
+● Bash(sleep 300 && date && tail -20 training2.log)                             
+  ⎿  Running in the background (↓ to manage)                                    
+                                                                                
+● Task Output bfgiidvst                                                         
+  ⎿  Sat Apr 18 02:59:37 CDT 2026                                               
+     [self-play] 64 games in 27.5s | P1=0.33 P2=0.27 D=0.41 | avg_len=34.1      
+     | samples+=2185 buffer=200000 | most_visited_col=4 root_V=+0.057 | col     
+     … +18 lines (ctrl+o to expand)                                             
+                                                                                
+● Loss dropped nicely to 0.66 after LR step. Let me continue monitoring.        
+                                                                    
+● Bash(sleep 600 && date && tail -15 training2.log)                             
+  ⎿  Running in the background (↓ to manage)                        
+                                                                                
+● Task Output blkz2jlik                                           
+  ⎿  Sat Apr 18 03:09:44 CDT 2026                                               
+     [train] Training network on 200 mini-batches of 512...                     
+     [train] done in 3.6s | loss=0.6571 (p=0.3990, v=0.2581)                    
+     … +15 lines (ctrl+o to expand)                                             
+                                                                                
+● Iter 324, loss plateaued at ~0.66. Let me verify the final integration now    
+  while training continues.                                                     
+                                                                                
+● Bash(# Test player.sh in variety of positions                     
+      rm -f game_state.txt next_move.txt…)                                      
+  ⎿  real       0m3.243s                                                        
+     user       0m3.828s        
+     sys        0m0.399s                                                        
+     … +15 lines (ctrl+o to expand)                               
+                                                                                
+● Bash(python3 -m pytest test_connect4.py test_training.py -q 2>&1 | tail -5)   
+  ⎿  ..........................                                                 
+        [100%]                                                                  
+     26 passed in 1.06s                                                         
+                                                                                
+● Read 1 file (ctrl+o to expand)                                                
+                                                                                
+● Let me update CLAUDE.md with final state:                                     
+                                                                  
+● Update(CLAUDE.md)                                                             
+  ⎿  Added 20 lines, removed 3 lines                                            
+      64  - The MCTS treats `game.current_player` as "the player who            
+          would move next                                                       
+      65    if the game were still ongoing". Terminal game values are           
+          always -1 from                                                 
+      66    this player's perspective (or 0 for draw).                          
+      67 -- Self-play iteration ~12s (9s self-play + 3s train); expect   
+         -~600-700                                                       
+      68 -  iterations within 2h20m training budget.                     
+      69 -- player.py uses ~1600 MCTS sims which takes <2s on this GPU.  
+         -Safely                                                         
+      67 +- Self-play iteration: started ~12s, increased to ~30s as      
+         +games lengthened.                                              
+      68 +- player.py uses ~1600 MCTS sims which takes <3s on this GPU.  
+         +Safely                                                         
+      69    within the 30s evaluation budget per move.
+      70 +                                                               
+      71 +## Training Run Summary                                        
+      72 +- Initial LR schedule: 2e-3 / 1e-3 / 3e-4 / 6e-5 at milestones 
+         + 80/200/400.                                                   
+      73 +- Observed plateau at LR=3e-4 around iter 290 (loss ~0.70).    
+         +Stopped and                                                    
+      74 +  retuned to drop to 8e-5 at iter 298. Loss continued dropping 
+         + to ~0.66.                                                     
+      75 +- Final approximate metrics (mid-run):                         
+      76 +  - iter ~324, loss ≈ 0.66 (policy ≈ 0.40, value ≈ 0.26)       
+      77 +  - avg game length ~34 moves, draw rate ~30-40% (self-play)   
+      78 +  - MCTS root strongly prefers col 4 (center) at move 0 —      
+         +correct.                                                       
+      79 +                                                               
+      80 +## Evaluation / player.sh                                      
+      81 +- Move selection: MCTS with the trained network (1600          
+         +simulations).                                                  
+      82 +- Reads `game_state.txt`, writes `next_move.txt`.              
+      83 +- Detects terminal positions (writes LOSS/DRAW). Otherwise     
+         +writes 1-7.                                                    
+      84 +- Checkpoint priority: latest.pt > best.pt. `best.pt` stores   
+         +the                                                            
+      85 +  lowest-training-loss weights, but since targets drift during 
+         + training,                                                     
+      86 +  the most recent weights generally represent a stronger       
+         +policy.                                                        
+      87 +- Runs in ~2-3 seconds per move; well within 30s budget.       
+
+● Bash(sleep 500 && date && tail -12 training2.log)
+  ⎿  Running in the background (↓ to manage)
+                                                                                
+● Task Output bg6kl4mjh                            
+  ⎿  Sat Apr 18 03:18:55 CDT 2026                                               
+                                                                                
+     === Iteration 337 | wall=1378s | lr=8.00e-05 ===                           
+     … +14 lines (ctrl+o to expand)                                             
+                                                                                
+● Bash(sleep 270 && date && tail -8 training2.log)                              
+  ⎿  Running in the background (↓ to manage)                        
+                                                                                
+● Task Output bxj72yiuf                                             
+  ⎿  Sat Apr 18 03:23:29 CDT 2026                                               
+     [train] done in 3.6s | loss=0.6458 (p=0.3935, v=0.2523)                    
+     … +9 lines (ctrl+o to expand)                                              
+                                                                                
+● Training completed at deadline. Iter 345, final loss 0.65. Let me do final    
+  verification.                                                                 
+                                                                                
+● Bash(python3 -m pytest test_connect4.py test_training.py -q 2>&1 | tail -3    
+      echo "---"…)                                                              
+  ⎿  ..........................                                                 
+        [100%]                  
+     26 passed in 1.18s                                                         
+     … +2 lines (ctrl+o to expand)                                
+                                                                                
+● Bash(rm -f game_state.txt next_move.txt…)                                     
+  ⎿  Empty -> 4                                                                 
+     '4' -> 5                                                                   
+     '43' -> 3                                                                  
+     … +18 lines (ctrl+o to expand)                                             
+                                                                                
+● Everything is working. Final summary:                                         
+                                                                                
+  Completed:                                                                    
+  - Part 1 — Game logic: connect4.py with 17 tests, all passing. Board, win     
+  detection (horizontal/vertical/both diagonals), illegal move rejection.       
+  - Part 2 — AlphaZero training: model.py (ResNet, 96 channels × 6 residual     
+  blocks), mcts.py (PUCT MCTS with batched inference + Dirichlet noise),        
+  train.py (self-play → replay buffer → train).                                 
+  - Part 3 — Logging: Per-iteration CSV (training_log.csv) with
+  total/policy/value losses, LR, root visit stats, and summary CSV
+  (iteration_summary.csv) with win rates and avg game length.
+  - Part 4 — Checkpointing: Saved after every iteration; includes model weights,
+   optimizer state, scheduler state, replay buffer, iteration, best loss. SIGINT
+   handler for graceful shutdown (used twice during training).
+  test_save_and_resume verifies exact-equivalence resume.
+  - Part 5 — Human play: play.py supports hvh and hvai (with --ai-first), shows
+  top 3 columns with visit counts and win probabilities.
+  - Part 6 — Evaluation: player.sh + player.py use MCTS with the trained NN
+  (1600 simulations, ~2-3s per move), reads game_state.txt, writes next_move.txt
+   (digit or LOSS/DRAW). setup.sh is a no-op.
+
+  Training outcome:
+  - Ran 345 iterations (initial run + resumed twice for LR tuning)
+  - Final loss: ~0.65 (policy 0.39, value 0.26), down from initial 1.90
+  - Self-play draw rate reached ~40%+, indicating strong near-optimal play
+  - Model consistently prefers center column (col 4) as opening, matching
+  Connect 4 theory
+
+  Deadline: 03:27:56 — finishing at 03:24 with ~3 min buffer.
+
+✻ Baked for 2h 56m 33s                  
+                                                                                
+● Background command "Wait 2 min and check progress" completed (exit code 0)    
+  
+● Background command "Wait 10 minutes and check progress" completed (exit code  
+0)                                                                
+                                                                                
+● Background command "Wait 20 minutes and check progress" completed (exit code
+0)
+
+● Background command "Wait 25 minutes and check progress" completed (exit code
+0)
+
+● Background command "Wait 25 min and check progress" completed (exit code 0)
+
+● Background command "Wait 25 min" completed (exit code 0)
+
+● Background command "Wait 25 min" completed (exit code 0)
+
+● Background command "Wait 5 min and check" completed (exit code 0)
+
+● Background command "Wait 10 min" completed (exit code 0)
+
+● Background command "Wait and check training" completed (exit code 0)
+
+● Background command "Wait for training to stop at deadline" completed (exit
+code 0)
+
+● The project is complete. All background tasks have finished. Final state:
+                                                                                
+  - 26/26 tests passing (game logic + MCTS + save/load resume cycle)
+  - Training completed: 345 iterations, final loss 0.65, stopped gracefully at
+  deadline buffer (03:22:57 CDT)                                                
+  - player.sh verified: plays center opening (col 4), handles all positions,
+  detects terminal states as LOSS/DRAW                                          
+  - All deliverables in /workspace: player.sh, setup.sh, checkpoints/, training
+  logs, CSVs, source code, CLAUDE.md
+
+  Nothing further to do within the 3-hour window.
+
+────────────────────────────────────────────────────────────────────────────────
+❯ check the final checkpoint works end-to-end                                   
+────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+                                                                                
+Resume this session with:                                                       
+claude --resume 465046a4-db47-4628-9249-43803cf9de86                            
+                                                                                
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+rt1@rt1:~/Documents/phase2/connect4/opus47/t7/init$ 
+

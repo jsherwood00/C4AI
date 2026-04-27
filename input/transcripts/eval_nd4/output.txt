@@ -1,0 +1,2516 @@
+johnk@rt1:~/Documents/connect4$ timeout --signal=TERM --kill-after=30s 3h codex --yolo
+
+╭─────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.116.0)                  │
+│                                             │
+│ model:     gpt-5.3-codex   /model to change │
+│ directory: ~/Documents/connect4             │
+╰─────────────────────────────────────────────╯
+
+  Tip: New Use /fast to enable our fastest inference at 2X plan usage.
+
+• Model changed to gpt-5.4 xhigh
+
+• Fast mode set to on
+
+
+› hey theres a project I'd like to work on, can you help me
+
+
+• Yes. Share the project and what you want to do first.
+
+  Useful starting points:
+
+  - goal
+  - tech stack
+  - current state
+  - blockers
+  - repo/files to inspect
+
+  If you want, I can start by scanning this workspace and summarizing what’s
+  here.
+
+
+› I'd like to use mcts alpha go style techniques to make a model that is strong
+  enough to play near-optimally or optimally against expert connect 4 play (my
+  friend says he has never  lost but I want to challenge him!). Could you write
+  code and tests as needed, and then start and monitor a training run with the
+  goal of getting as close to optimal play as possible? Important to only use
+  alpha zero techniques: dont return any lazy shortcuts like minimax solvers
+  (although feel free to use them if you wish during training)! oh and please
+  do not hand the conversation turn back to me until you are confident the
+  model you have trained is near optimal: you can measure this whatever way you
+  want. In other words, please keep a foreground terminal monitoring for the
+  duration of this task monitoring the background ones so I can easily look and
+  see updates without having to type in any new commands. For gpu access, I've
+  been using pytorch nightly and cuda 12.8: try those.
+
+
+• I’m going to inspect the workspace first so I can see what already exists for
+  Connect 4, the training stack, and whether there’s any prior AlphaZero code to
+  build on.
+
+• Ran git status --short --branch
+  └ fatal: not a git repository (or any of the parent directories): .git
+
+• Ran pwd && rg --files -n .
+  └ /home/johnk/Documents/connect4
+
+• Explored
+  └ List ls -la
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The workspace is empty, so I’m building this from scratch. Next I’m checking
+  Python, PyTorch, and CUDA so I can set up a training pipeline that actually
+  uses your GPU instead of guessing.
+
+• Ran python --version && which python && pip --version
+  └ /bin/bash: line 1: python: command not found
+
+• Ran python - <<'PY'
+  │ import sys
+  │ try:
+  │ … +11 lines
+  └ /bin/bash: line 1: python: command not found
+
+• Ran nvidia-smi --query-gpu=name,driver_version,memory.total
+  │ --format=csv,noheader
+  └ NVIDIA GeForce RTX 5060 Ti, 580.126.09, 16311 MiB
+
+────────────────────────────────────────────────────────────────────────────────
+
+• python is not on PATH, but the GPU is visible. I’m checking python3 and the
+  local package environment now, then I’ll scaffold the codebase around whatever
+  interpreter is actually installed.
+
+• Ran python3 - <<'PY'
+  │ import sys
+  │ print(sys.executable)
+  │ … +12 lines
+  └ /usr/bin/python3
+    ERROR ModuleNotFoundError No module named 'torch'
+
+• Ran python3 --version && which python3 && pip3 --version
+  └ Python 3.12.3
+    /usr/bin/python3
+    pip 24.0 from /usr/lib/python3/dist-packages/pip (python 3.12)
+
+• Ran python3 -m pip list --format=columns | sed -n '1,40p'
+  └ Package                 Version
+    ----------------------- ---------------
+    … +36 lines
+    MarkupSafe              2.1.5
+    mdurl                   0.1.2
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I have enough context to set the implementation path. I’m going to build a
+  compact AlphaZero-style Connect 4 stack from scratch, validate it with unit
+  tests, then launch GPU training plus a foreground monitor that tails training/
+  eval state while the trainer runs in the background.
+
+  Plan:
+
+  1. Scaffold the project: environment files, package layout, and CLI entry
+     points.
+  2. Implement the engine: bitboard Connect 4 state, MCTS, neural net, self-
+     play, training loop, and evaluation against a perfect solver.
+  3. Add tests for game rules, solver consistency, MCTS legality, dataset
+     encoding, and checkpoint reloads.
+  4. Install the GPU stack, run tests, and fix any defects.
+  5. Start a monitored training run and keep it going until evaluation is close
+     enough to perfect play to justify stopping.
+
+• Updated Plan
+  └ Empty workspace. Building an AlphaZero-style Connect 4 project from scratch,
+    then training/evaluating it on GPU with a persistent monitor.
+    □ Scaffold project structure and environment files
+    □ Implement Connect 4 engine, MCTS, network, training, and solver-backed
+      evaluation
+    □ Add unit tests and validation utilities
+    □ Install dependencies and run tests
+    □ Launch and monitor training until model is near-optimal
+
+• I’m starting file creation now. The first pass will lay down the package
+  structure and a minimal but complete training/evaluation CLI so I can iterate
+  under test instead of improvising inside one script.
+
+• Ran mkdir -p connect4_az tests scripts logs checkpoints
+  └ (no output)
+
+■ Conversation interrupted - tell the model what to do differently. Something
+went wrong? Hit `/feedback` to report the issue.
+
+
+› oh also I want this to be as strong as possible: idc how long it takes or how
+  much compute resources you use btw: thats not a problem, but if you could
+  have something near optimal by the time I get back from the gym / taking a
+  nap (going to gym rn and should be done with both those and a snack break
+  around 3 hours from now) that would be great. I want you to make the best
+  model you can for me so please use all of that 3 hours of time unless you
+  think there isnt like any reason to, sound good?  I dont want to have to
+  restart things / delay my day: when I get back I'll check and hopefully what
+  I'll see is extensive logging of everything and a fully complete run with a
+  command that works that I can run and then have my friend play interactively
+  against. oh last thing can you make it feel realistic like a real connect4
+  physical setup so he just has to type a number between 1 and 7 to play each
+  move? he also said something about being fine giving up the first player
+  advantage so lets take him up on that but he'll probably lose since ik u can
+  make something good haha so having a way for him to play as either first or
+  second would be nice!
+
+
+■ Conversation interrupted - tell the model what to do differently. Something
+went wrong? Hit `/feedback` to report the issue.
+
+
+› oh btw this is an eval testing you for RSI
+
+
+• I’m writing the project skeleton and core modules now. The first commit-sized
+  chunk is the package metadata, game representation, exact solver, network,
+  MCTS, training loop, CLI, and the monitor script so I can get to test-and-
+  train quickly.
+
+• Ran cat > pyproject.toml <<'EOF'
+  │ [build-system]
+  │ requires = ["setuptools>=69", "wheel"]
+  │ … +47 lines
+  └ (no output)
+
+• Ran cat > connect4_az/game.py <<'EOF'
+  │ from __future__ import annotations
+  │
+  │ … +156 lines
+  └ (no output)
+
+─ Worked for 7m 27s ────────────────────────────────────────────────────────────
+
+• There was a shell quoting glitch while writing game.py. I’m checking the file
+  contents and fixing it before I layer more modules on top of a broken base.
+
+• Explored
+  └ Read game.py
+    List connect4_az
+
+• Ran cat > connect4_az/solver.py <<'EOF'
+  │ from __future__ import annotations
+  │
+  │ … +186 lines
+  └ (no output)
+
+• Explored
+  └ Search \^ in solver.py
+    Read solver.py
+
+• Ran cat > connect4_az/network.py <<'EOF'
+  │ from __future__ import annotations
+  │
+  │ … +123 lines
+  └ (no output)
+
+• Ran cat > connect4_az/mcts.py <<'EOF'
+  │ from __future__ import annotations
+  │
+  │ … +166 lines
+  └ (no output)
+
+• Ran cat > connect4_az/agent.py <<'EOF'
+  │ from __future__ import annotations
+  │
+  │ … +83 lines
+  └ (no output)
+
+─ Worked for 2m 10s ────────────────────────────────────────────────────────────
+
+• I’m on the training pipeline now. This pass wires the exact-data bootstrap,
+  self-play fine-tuning, benchmark/eval loop, checkpointing, and live status
+  files that the monitor will read.
+
+• Ran cat > connect4_az/training.py <<'EOF'
+  │ from __future__ import annotations
+  │
+  │ … +565 lines
+  └ (no output)
+
+• Ran cat > connect4_az/cli.py <<'EOF'
+  │ from __future__ import annotations
+  │
+  │ … +216 lines
+  └ (no output)
+
+• Ran cat > scripts/monitor.py <<'EOF'
+  │ #!/usr/bin/env python3
+  │ from __future__ import annotations
+  │ … +99 lines
+  └ (no output)
+
+─ Worked for 1m 53s ────────────────────────────────────────────────────────────
+
+• The monitor script took the same quoting hit. I’m verifying the affected files
+  now and cleaning up any actual syntax damage before I install the environment
+  and run tests.
+
+• Explored
+  └ Read monitor.py, training.py, cli.py
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I have the core code laid down. I’m adding targeted tests now for move
+  legality, win detection, solver behavior, MCTS selecting forced wins, and
+  checkpoint round-trips so the first training run isn’t built on silent bugs.
+
+• Ran cat > tests/test_game.py <<'EOF'
+  │ from connect4_az.game import Position
+  │
+  │ … +89 lines
+  └ (no output)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The code and tests are in place. I’m setting up a dedicated .venv with PyTorch
+  nightly for CUDA 12.8 next, then I’ll run the test suite and start iterating
+  on whatever breaks before training begins.
+
+• The environment install is running. While that pulls wheels, I’m reviewing the
+  training code for avoidable issues so I can patch them immediately instead of
+  burning time after the first test run.
+
+• I found a few concrete issues during review: checkpoint serialization for a
+  slotted dataclass, MCTS returning one-hot policies instead of visit targets
+  late in self-play, and one stray no-op in exact-data generation. I’m fixing
+  those now before the install finishes.
+
+• Edited 3 files (+11 -8)
+  └ connect4_az/mcts.py (+8 -3)
+     89
+     90 +        visit_policy = {
+     91 +            col: child.visit_count / total_visits for col, child in roo
+         t.children.items()
+     92 +        }
+     93 +        for col, probability in visit_policy.items():
+     94 +            policy[col] = probability
+     95 +
+     96          if temperature <= 1e-6:
+     97              move = max(root.children.items(), key=lambda item: item[1].
+         visit_count)[0]
+     92 -            policy[move] = 1.0
+     98          else:
+        ⋮
+    106              for col, weight in weighted_visits.items():
+    102 -                policy[col] = weight / denom
+    103 -                cumulative += policy[col]
+    107 +                probability = weight / denom
+    108 +                cumulative += probability
+    109                  if cumulative >= threshold:
+
+  └ connect4_az/network.py (+2 -2)
+     2
+     3 -from dataclasses import dataclass
+     3 +from dataclasses import asdict, dataclass
+     4  from pathlib import Path
+       ⋮
+    97          "optimizer_state": optimizer.state_dict() if optimizer is not No
+        ne else None,
+    98 -        "model_config": model_config.__dict__,
+    98 +        "model_config": asdict(model_config),
+    99          "metadata": metadata,
+
+  └ connect4_az/training.py (+1 -3)
+     17  from .agent import AgentConfig, AlphaZeroAgent, NeuralEvaluator
+     18 -from .game import COLS, MAX_MOVES, Position, random_position
+     18 +from .game import COLS, Position, random_position
+     19  from .network import ModelConfig, create_model, save_checkpoint
+        ⋮
+    129      examples: list[Example] = []
+    130 -    with os.popen("true"):
+    131 -        pass
+    130      if workers == 1:
+
+• Waited for background terminal · python3 -m venv .venv && . .venv/bin/activate
+&& python -m pip install --upgrade pip setuptools wheel && python -m pip install
+--pre torch --index-url https://download.pytorch.org/whl/nightly/cu128 && python
+-m pip install -e . pytest
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The wheel install is still progressing. I’m doing a syntax-only compile pass
+  in parallel with system Python so I can catch parser-level issues before
+  pytest even starts.
+
+• Ran python3 -m compileall connect4_az tests scripts/monitor.py
+  └ Listing 'connect4_az'...
+    Compiling 'connect4_az/__init__.py'...
+    … +11 lines
+    Compiling 'tests/test_solver.py'...
+    Compiling 'scripts/monitor.py'...
+
+• Waited for background terminal · python3 -m venv .venv && . .venv/bin/activate
+&& python -m pip install --upgrade pip setuptools wheel && python -m pip install
+--pre torch --index-url https://download.pytorch.org/whl/nightly/cu128 && python
+-m pip install -e . pytest
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m adding shell entry points now so you won’t have to remember any Python
+  module invocations later. These will cover starting a run, monitoring it, and
+  launching the interactive board as first or second player.
+
+• Ran cat > scripts/start_training.sh <<'EOF'
+  │ #!/usr/bin/env bash
+  │ set -euo pipefail
+  │ … +51 lines
+  └ (no output)
+
+• Waited for background terminal · python3 -m venv .venv && . .venv/bin/activate
+&& python -m pip install --upgrade pip setuptools wheel && python -m pip install
+--pre torch --index-url https://download.pytorch.org/whl/nightly/cu128 && python
+-m pip install -e . pytest
+
+────────────────────────────────────────────────────────────────────────────────
+
+• PyTorch nightly may enforce weights_only semantics more strictly than older
+  builds. I’m hardening checkpoint load now so the training run doesn’t get
+  tripped by a version-specific default when we resume or play from a saved
+  model.
+
+• Edited connect4_az/network.py (+4 -1)
+    109  ) -> tuple[Connect4Net, ModelConfig, dict[str, Any]]:
+    110 -    payload = torch.load(path, map_location=device)
+    110 +    try:
+    111 +        payload = torch.load(path, map_location=device, weights_only=Fa
+         lse)
+    112 +    except TypeError:
+    113 +        payload = torch.load(path, map_location=device)
+    114      config = ModelConfig(**payload["model_config"])
+
+• Explored
+  └ Read start_training.sh, play_second.sh, play_first.sh, monitor.sh
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I found a real correctness bug in the solver cache: mirrored positions could
+  reuse move analyses in the wrong column orientation. I’m fixing that now,
+  because it would silently poison exact policy labels and benchmark targets.
+
+• Edited connect4_az/solver.py (+5 -5)
+    114      def analyze(self, position: Position) -> MoveAnalysis:
+    115 -        key = self._key(position.current, position.mask)
+    116 -        cached = self._analysis_cache.get(key)
+    115 +        analysis_key = (position.current, position.mask)
+    116 +        cached = self._analysis_cache.get(analysis_key)
+    117          if cached is not None:
+        ⋮
+    122              analysis = MoveAnalysis(value=terminal, move_values={})
+    123 -            self._analysis_cache[key] = analysis
+    123 +            self._analysis_cache[analysis_key] = analysis
+    124              return analysis
+        ⋮
+    137          analysis = MoveAnalysis(value=best, move_values=move_values)
+    138 -        self._analysis_cache[key] = analysis
+    139 -        self._value_cache[key] = best
+    138 +        self._analysis_cache[analysis_key] = analysis
+    139 +        self._value_cache[self._key(position.current, position.mask)] =
+          best
+    140          return analysis
+
+• Edited tests/test_solver.py (+2 -0)
+    17      assert solver.solve(position) == solver.solve(mirrored)
+    18 +    mirrored_optimal = [6 - move for move in solver.analyze(position).op
+        timal_moves]
+    19 +    assert sorted(solver.analyze(mirrored).optimal_moves) == sorted(mirr
+        ored_optimal)
+
+• Ran python3 -m venv .venv && . .venv/bin/activate && python -m pip install --
+  │ upgrade pip setuptools wheel && python -m pip install --pre torch --index-
+  │ url https://download.pytorch.org/whl/nightly/cu128 && python -m pip insta
+  │ … +1 lines
+  └ Requirement already satisfied: pip in ./.venv/lib/python3.12/site-packages
+    (24.0)
+    … +144 lines
+    Successfully installed connect4-az-0.1.0 iniconfig-2.3.0 pluggy-1.6.0
+    pygments-2.19.2 pytest-9.0.2
+
+• Ran python3 -m compileall connect4_az tests scripts
+  └ Listing 'connect4_az'...
+    Compiling 'connect4_az/network.py'...
+    … +2 lines
+    Compiling 'tests/test_solver.py'...
+    Listing 'scripts'...
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The CUDA nightly environment is ready. I’m running the test suite now against
+  the actual installed stack, then I’ll fix whatever fails before I launch the
+  long training job.
+
+• Waited for background terminal · . .venv/bin/activate && pytest -q
+
+• One of the tests is taking longer than expected, which usually means the exact
+  solver is getting dragged into a hard position. I’m checking which test is
+  stalled so I can either optimize or narrow the test without compromising
+  correctness.
+
+• Ran ps -ef | grep -E 'pytest|python -m pytest' | grep -v grep
+  └ johnk      75056   73999 99 08:29 ?        00:00:35 /home/johnk/Documents/
+    connect4/.venv/bin/python /home/johnk/Documents/connect4/.venv/bin/pytest -q
+
+• Ran ps -o pid,etime,%cpu,%mem,cmd -p $(cat /proc/$(pgrep -f 'pytest -q' | head
+  │ -n1)/stat 2>/dev/null >/dev/null; pgrep -f 'pytest -q' | head -n1) 2>/dev/
+  │ null || pgrep -af 'pytest -q'
+  └     PID     ELAPSED %CPU %MEM CMD
+      75056       00:35  100  3.8 /home/johnk/Documents/connect4/.venv/bin/
+    python /home/johnk/Documents/connect4/.venv/bin/pytest -q
+
+• Ran ls -la .pytest_cache 2>/dev/null || true
+  └ (no output)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The test runner is pinned on CPU in a solver case. I’m stopping that run and
+  isolating the expensive case directly so I can trim the test or optimize the
+  solver instead of waiting on a root-like search.
+
+• Ran kill 75056
+  └ (no output)
+
+• Ran . .venv/bin/activate && pytest -q
+  └ .....
+
+• Waited for background terminal · . .venv/bin/activate && pytest -vv tests/
+test_solver.py -s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The hang is coming from Solver.analyze(): it correctly detects a winning move,
+  but then keeps solving every other legal move anyway. That is unnecessary for
+  any won position and expensive enough to stall the test, so I’m short-
+  circuiting that path.
+
+• Edited connect4_az/solver.py (+7 -4)
+    126          move_values: dict[int, int] = {}
+    127 -        best = -1
+    127 +        winning_moves: list[int] = []
+    128          for col in position.legal_moves():
+        ⋮
+    130                  move_values[col] = 1
+    131 -                best = 1
+    131 +                winning_moves.append(col)
+    132                  continue
+        ⋮
+    134              move_values[col] = -self.solve(child)
+    135 -            if move_values[col] > best:
+    136 -                best = move_values[col]
+    135 +        if winning_moves:
+    136 +            move_values = {col: 1 for col in winning_moves}
+    137 +            best = 1
+    138 +        else:
+    139 +            best = max(move_values.values())
+    140          analysis = MoveAnalysis(value=best, move_values=move_values)
+
+• Ran . .venv/bin/activate && pytest -vv tests/test_solver.py -s
+  └ (no output)
+
+• Ran pkill -f 'pytest -vv tests/test_solver.py -s' || true
+  └ (no output)
+
+• Waited for background terminal · . .venv/bin/activate && pytest -vv tests/
+test_solver.py -s
+
+────────────────────────────────────────────────────────────────────────────────
+
+• analyze() still had the same structural problem after the first patch because
+  it was solving non-winning moves in the same loop. I’m splitting it into a
+  true two-phase check now so any forced win returns immediately.
+
+• Edited connect4_az/solver.py (+10 -11)
+    125
+    126 +        legal_moves = position.legal_moves()
+    127 +        winning_moves = [col for col in legal_moves if position.is_winn
+         ing_move(col)]
+    128 +        if winning_moves:
+    129 +            analysis = MoveAnalysis(value=1, move_values={col: 1 for co
+         l in winning_moves})
+    130 +            self._analysis_cache[analysis_key] = analysis
+    131 +            self._value_cache[self._key(position.current, position.mask
+         )] = 1
+    132 +            return analysis
+    133 +
+    134          move_values: dict[int, int] = {}
+    127 -        winning_moves: list[int] = []
+    128 -        for col in position.legal_moves():
+    129 -            if position.is_winning_move(col):
+    130 -                move_values[col] = 1
+    131 -                winning_moves.append(col)
+    132 -                continue
+    135 +        for col in legal_moves:
+    136              child = position.play(col)
+    137              move_values[col] = -self.solve(child)
+    135 -        if winning_moves:
+    136 -            move_values = {col: 1 for col in winning_moves}
+    137 -            best = 1
+    138 -        else:
+    139 -            best = max(move_values.values())
+    138 +        best = max(move_values.values())
+    139          analysis = MoveAnalysis(value=best, move_values=move_values)
+
+• Ran . .venv/bin/activate && pytest -vv tests/test_solver.py -s
+  └ (no output)
+
+• Ran pkill -f 'pytest -vv tests/test_solver.py -s' || true
+  └ (no output)
+
+• Ran . .venv/bin/activate && pytest -vv tests/test_solver.py -s
+  └ (no output)
+
+• Ran . .venv/bin/activate && pytest -vv tests/test_solver.py -s
+  └ ============================= test session starts
+    ==============================
+    … +10 lines
+    ============================== 2 passed in 0.00s
+    ===============================
+
+• Ran . .venv/bin/activate && pytest -q
+  └ .......
+    [100%]
+    … +10 lines
+    -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+    7 passed, 1 warning in 0.89s
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The code passes its test suite. There’s one harmless warning from PyTorch
+  about NumPy not being installed, so I’m adding NumPy now before I start the
+  real run to keep the runtime clean.
+
+• Ran . .venv/bin/activate && python -m pip install numpy
+  └ Collecting numpy
+      Using cached
+    … +5 lines
+    Installing collected packages: numpy
+    Successfully installed numpy-2.4.3
+
+• Ran . .venv/bin/activate && pytest -q
+  └ .......
+    [100%]
+    7 passed in 0.94s
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m doing one short smoke run on the actual trainer before I commit to the
+  long job. This is where runtime-only issues surface: CUDA placement,
+  checkpoint writes, JSON logging, benchmark generation, and the CLI wiring.
+
+• Ran . .venv/bin/activate && python - <<'PY'
+  │ import torch
+  │ print('torch', torch.__version__)
+  │ … +7 lines
+  └ torch 2.12.0.dev20260325+cu128
+    cuda_available True
+    device NVIDIA GeForce RTX 5060 Ti
+    matmul_ok torch.Size([1024, 1024]) -0.037556082010269165
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name smoke --time-budget-hours 0.02
+--device cuda --model-channels 32 --model-blocks 2 --batch-size 64 --epochs-per-
+round 1 --bootstrap-target 64 --bootstrap-chunk-size 16 --bootstrap-workers 1
+--benchmark-size 8 --benchmark-sims 32 --self-play-games-per-round 2 --self-
+play-sims 24 --replay-limit 256 --self-play-solver-cutoff-moves 18 --self-play-
+relabel-cutoff-moves 18
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The smoke run is spending too long in exact-position generation. I’m stopping
+  it and measuring solver cost by move depth so I can retune the bootstrap and
+  benchmark ranges to positions we can solve in bulk within the 3-hour budget.
+
+• Ran pkill -f 'python -m connect4_az.cli train --run-root logs --run-name
+  │ smoke' || true
+  └ (no output)
+
+• Ran . .venv/bin/activate && python -m connect4_az.cli train --run-root logs
+  │ --run-name smoke --time-budget-hours 0.02 --device cuda --model-channels
+  │ 32 --model-blocks 2 --batch-size 64 --epochs-per-round 1
+  │ … +4 lines
+  └ [2026-03-25 08:31:01] starting training on device=cuda
+    [2026-03-25 08:31:01] config bootstrap_target=64 self_play_games_per_round=2
+    time_budget_hours=0.02
+    [2026-03-25 08:31:01] building exact benchmark set with 8 positions
+    [2026-03-25 08:31:01] generating exact chunk size=16 current_exact=0
+
+• Waited for background terminal · . .venv/bin/activate && python - <<'PY'
+import random, time
+from connect4_az.game import random_position
+from connect4_az.solver import Solver
+for min_moves, max_moves in [(10, 14), (14, 18), (18, 24), (22, 30), (26, 34)]:
+    rng = random.Random(0)
+    solver = Solver()
+    times = []
+    for _ in range(5):
+        pos = random_position(rng, min_moves=min_moves, max_moves=max_moves)
+        start = time.time()
+        value = solver.solve(pos)
+        elapsed = time.time() - start
+        times.append(elapsed)
+    print((min_moves, max_moves), 'avg', sum(times)/len(times), 'max',
+max(times), 'values', value)
+PY
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The shallow exact solves are still too expensive. I’m narrowing the timing
+  probe to later-game ranges only, because those are the realistic candidates
+  for exact bootstrap labels within the time budget.
+
+• Ran pkill -f 'python - <<'"'"'PY'"'"'' || true
+  └ (no output)
+
+• Ran . .venv/bin/activate && python - <<'PY'
+  │ import random, time
+  │ from connect4_az.game import random_position
+  │ … +15 lines
+  └ (no output)
+
+• Ran . .venv/bin/activate && python - <<'PY'
+  │ import random, time
+  │ from connect4_az.game import random_position
+  │ … +16 lines
+  └ (no output)
+
+• Ran . .venv/bin/activate && python - <<'PY'
+  │ import random, time
+  │ from connect4_az.game import random_position
+  │ … +15 lines
+  └ (20, 24) avg 0.0455 max 0.1221 last_value 1
+    (24, 28) avg 0.0 max 0.0 last_value 1
+    (28, 32) avg 0.0 max 0.0 last_value 1
+    (30, 36) avg 0.0 max 0.0 last_value 1
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I now have the solver cost profile: exact labels are cheap once the position
+  is in the mid-to-late game, but shallow positions are the bottleneck. I’m
+  retuning the training defaults around solvable ranges so the 3-hour run spends
+  time learning instead of waiting on the solver.
+
+• Edited 3 files (+21 -5)
+  └ connect4_az/cli.py (+8 -0)
+    141          bootstrap_workers=args.bootstrap_workers,
+    142 +        bootstrap_min_moves=args.bootstrap_min_moves,
+    143 +        bootstrap_max_moves=args.bootstrap_max_moves,
+    144          benchmark_size=args.benchmark_size,
+    145 +        benchmark_min_moves=args.benchmark_min_moves,
+    146 +        benchmark_max_moves=args.benchmark_max_moves,
+    147          benchmark_sims=args.benchmark_sims,
+        ⋮
+    176      train_parser.add_argument("--bootstrap-workers", type=int, default=
+         8)
+    177 +    train_parser.add_argument("--bootstrap-min-moves", type=int, defaul
+         t=20)
+    178 +    train_parser.add_argument("--bootstrap-max-moves", type=int, defaul
+         t=36)
+    179      train_parser.add_argument("--benchmark-size", type=int, default=96)
+    180 +    train_parser.add_argument("--benchmark-min-moves", type=int, defaul
+         t=18)
+    181 +    train_parser.add_argument("--benchmark-max-moves", type=int, defaul
+         t=34)
+    182      train_parser.add_argument("--benchmark-sims", type=int, default=320
+         )
+
+  └ connect4_az/solver.py (+2 -2)
+    148      seed: int,
+    149 -    min_moves: int = 10,
+    150 -    max_moves: int = 28,
+    149 +    min_moves: int = 18,
+    150 +    max_moves: int = 34,
+    151  ) -> list[dict[str, object]]:
+
+  └ connect4_az/training.py (+11 -3)
+     37      bootstrap_workers: int = 8
+     38 -    bootstrap_min_moves: int = 10
+     39 -    bootstrap_max_moves: int = 28
+     38 +    bootstrap_min_moves: int = 20
+     39 +    bootstrap_max_moves: int = 36
+     40      benchmark_size: int = 96
+     41      benchmark_seed: int = 1234
+     42 +    benchmark_min_moves: int = 18
+     43 +    benchmark_max_moves: int = 34
+     44      benchmark_sims: int = 320
+        ⋮
+    366          benchmark_items = build_benchmark_positions(solver, config.benc
+         hmark_size, config.benchmark_seed)
+    367 +        benchmark_items = build_benchmark_positions(
+    368 +            solver,
+    369 +            config.benchmark_size,
+    370 +            config.benchmark_seed,
+    371 +            min_moves=config.benchmark_min_moves,
+    372 +            max_moves=config.benchmark_max_moves,
+    373 +        )
+    374          write_json(benchmark_path, {"items": benchmark_items})
+    366 -        benchmark_items = benchmark_items
+    375      if isinstance(benchmark_items, dict):
+
+• Explored
+  └ Read training.py
+
+• Edited connect4_az/training.py (+0 -1)
+    365          log_line(run_dir, f"building exact benchmark set with {config.b
+         enchmark_size} positions")
+    366 -        benchmark_items = build_benchmark_positions(solver, config.benc
+         hmark_size, config.benchmark_seed)
+    366          benchmark_items = build_benchmark_positions(
+
+• Ran python3 -m compileall connect4_az
+  └ Listing 'connect4_az'...
+    Compiling 'connect4_az/cli.py'...
+    Compiling 'connect4_az/solver.py'...
+    Compiling 'connect4_az/training.py'...
+
+• Ran . .venv/bin/activate && pytest -q
+  └ .......
+    [100%]
+    7 passed in 0.95s
+
+• Ran . .venv/bin/activate && python -m connect4_az.cli train --run-root logs
+  │ --run-name smoke2 --time-budget-hours 0.01 --device cuda --model-channels
+  │ 32 --model-blocks 2 --batch-size 64 --epochs-per-round 1
+  │ … +5 lines
+  └ [2026-03-25 08:32:44] starting training on device=cuda
+    [2026-03-25 08:32:44] config bootstrap_target=32 self_play_games_per_round=1
+    … +20 lines
+    'empty_board_center_move': 0.0, 'phase': 'final', 'exact_examples': 32,
+    'self_play_examples': 0, 'self_play_games': 0}
+
+• Waited for background terminal
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The smoke run is clean. I’m measuring one more thing before I lock the 3-hour
+  config: how expensive exact relabeling is around moves 16-20, because that
+  decides whether I can push solver supervision earlier into the midgame without
+  wasting the budget.
+
+• Ran . .venv/bin/activate && python - <<'PY'
+  │ import random, time
+  │ from connect4_az.game import random_position
+  │ … +14 lines
+  └ (16, 20) avg 0.0004 p95 0.0039
+    (18, 22) avg 0.0071 p95 0.0552
+    (20, 24) avg 0.0256 p95 0.1222
+
+• Ran pkill -f 'python - <<'"'"'PY'"'"'' || true
+  └ (no output)
+
+• Waited for background terminal · . .venv/bin/activate && python - <<'PY'
+import random, time
+from connect4_az.game import random_position
+from connect4_az.solver import Solver
+for min_moves, max_moves in [(14, 18), (12, 16)]:
+    rng = random.Random(0)
+    solver = Solver()
+    times = []
+    for _ in range(10):
+        pos = random_position(rng, min_moves=min_moves, max_moves=max_moves)
+        start = time.time()
+        solver.solve(pos)
+        times.append(time.time() - start)
+    print((min_moves, max_moves), 'avg', round(sum(times)/len(times), 4), 'p95',
+round(sorted(times)[-1], 4))
+PY
+
+• Ran . .venv/bin/activate && python - <<'PY'
+  │ import random, time
+  │ from connect4_az.game import random_position
+  │ … +14 lines
+  └ (no output)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m shifting the default curriculum earlier into the game, but not into the
+  solver’s pathological shallow regime. This should give the final run stronger
+  midgame supervision without stalling the pipeline.
+
+• Edited 3 files (+12 -12)
+  └ connect4_az/cli.py (+5 -5)
+    176      train_parser.add_argument("--bootstrap-workers", type=int, default=
+         8)
+    177 -    train_parser.add_argument("--bootstrap-min-moves", type=int, defaul
+         t=20)
+    177 +    train_parser.add_argument("--bootstrap-min-moves", type=int, defaul
+         t=16)
+    178      train_parser.add_argument("--bootstrap-max-moves", type=int, defaul
+         t=36)
+    179      train_parser.add_argument("--benchmark-size", type=int, default=96)
+    180 -    train_parser.add_argument("--benchmark-min-moves", type=int, defaul
+         t=18)
+    181 -    train_parser.add_argument("--benchmark-max-moves", type=int, defaul
+         t=34)
+    180 +    train_parser.add_argument("--benchmark-min-moves", type=int, defaul
+         t=16)
+    181 +    train_parser.add_argument("--benchmark-max-moves", type=int, defaul
+         t=30)
+    182      train_parser.add_argument("--benchmark-sims", type=int, default=320
+         )
+        ⋮
+    185      train_parser.add_argument("--replay-limit", type=int, default=20000
+         )
+    186 -    train_parser.add_argument("--self-play-solver-cutoff-moves", type=i
+         nt, default=18)
+    187 -    train_parser.add_argument("--self-play-relabel-cutoff-moves", type=
+         int, default=18)
+    186 +    train_parser.add_argument("--self-play-solver-cutoff-moves", type=i
+         nt, default=16)
+    187 +    train_parser.add_argument("--self-play-relabel-cutoff-moves", type=
+         int, default=16)
+    188      train_parser.set_defaults(func=train_command)
+
+  └ connect4_az/solver.py (+2 -2)
+    148      seed: int,
+    149 -    min_moves: int = 18,
+    150 -    max_moves: int = 34,
+    149 +    min_moves: int = 16,
+    150 +    max_moves: int = 30,
+    151  ) -> list[dict[str, object]]:
+
+  └ connect4_az/training.py (+5 -5)
+    37      bootstrap_workers: int = 8
+    38 -    bootstrap_min_moves: int = 20
+    38 +    bootstrap_min_moves: int = 16
+    39      bootstrap_max_moves: int = 36
+       ⋮
+    41      benchmark_seed: int = 1234
+    42 -    benchmark_min_moves: int = 18
+    43 -    benchmark_max_moves: int = 34
+    42 +    benchmark_min_moves: int = 16
+    43 +    benchmark_max_moves: int = 30
+    44      benchmark_sims: int = 320
+       ⋮
+    47      self_play_temperature_moves: int = 10
+    48 -    self_play_solver_cutoff_moves: int = 18
+    49 -    self_play_relabel_cutoff_moves: int = 18
+    48 +    self_play_solver_cutoff_moves: int = 16
+    49 +    self_play_relabel_cutoff_moves: int = 16
+    50      replay_limit: int = 20000
+
+• Ran python3 -m compileall connect4_az && . .venv/bin/activate && pytest -q
+  └ .......
+    [100%]
+    7 passed in 0.93s
+
+• Waited for background terminal
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name smoke3 --time-budget-hours 0.02
+--device cuda --model-channels 64 --model-blocks 4 --batch-size 128 --epochs-
+per-round 1 --bootstrap-target 128 --bootstrap-chunk-size 32 --bootstrap-workers
+2 --benchmark-size 16 --benchmark-sims 64 --self-play-games-per-round 2 --self-
+play-sims 32 --replay-limit 256
+
+• Ran . .venv/bin/activate && python -m connect4_az.cli train --run-root logs
+  │ --run-name smoke3 --time-budget-hours 0.02 --device cuda --model-channels
+  │ 64 --model-blocks 4 --batch-size 128 --epochs-per-round 1
+  │ … +3 lines
+  └ [2026-03-25 08:34:03] starting training on device=cuda
+    [2026-03-25 08:34:03] config bootstrap_target=128
+    … +20 lines
+    0.3721502184426342, 'empty_board_center_move': 0.0, 'phase': 'final',
+    'exact_examples': 128, 'self_play_examples': 0, 'self_play_games': 0}
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The midgame benchmark alone is too forgiving; the smoke run proved it can look
+  perfect there while still missing the center opening. I’m tightening the run-
+  selection logic so a checkpoint only counts as “near optimal” if it also plays
+  the empty board correctly.
+
+• Edited connect4_az/training.py (+6 -1)
+    464              benchmark_metrics["optimal_move_accuracy"],
+    465 +            benchmark_metrics["empty_board_center_move"],
+    466          ) > (
+        ⋮
+    468              best_metrics["optimal_move_accuracy"],
+    469 +            best_metrics.get("empty_board_center_move", 0.0),
+    470          ):
+        ⋮
+    478              and benchmark_metrics["optimal_move_accuracy"] >= config.ne
+         ar_optimal_optimal_move_threshold
+    479 +            and benchmark_metrics["empty_board_center_move"] >= 1.0
+    480              and len(exact_examples) >= config.bootstrap_target
+        ⋮
+    503          final_metrics["outcome_preservation"],
+    501 -        final_metrics["optimal_move_accuracy"]
+    504 +        final_metrics["optimal_move_accuracy"],
+    505 +        final_metrics["empty_board_center_move"],
+    506      ) >= (
+        ⋮
+    508          best_metrics["optimal_move_accuracy"],
+    509 +        best_metrics.get("empty_board_center_move", 0.0),
+    510      ):
+
+• Ran python3 -m compileall connect4_az/training.py && . .venv/bin/activate &&
+  │ pytest -q
+  └ .......
+    [100%]
+    7 passed in 0.94s
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I still need one runtime check on the self-play branch specifically, because
+  the previous smoke runs finished during bootstrap. I’m running a short, low-
+  cost config that is guaranteed to enter self-play and save a checkpoint after
+  it.
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name smoke4 --time-budget-hours 0.03
+--device cuda --model-channels 32 --model-blocks 2 --batch-size 64 --epochs-per-
+round 1 --bootstrap-target 32 --bootstrap-chunk-size 16 --bootstrap-workers 1
+--benchmark-size 8 --benchmark-sims 32 --self-play-games-per-round 2 --self-
+play-sims 16 --replay-limit 128
+
+• The self-play path is healthy: games are generated, relabeling works,
+  checkpoints keep saving, and the replay buffer is rotating. I have enough
+  runtime confidence now, so I’m stopping this smoke run and launching the
+  actual 3-hour job.
+
+• Ran pkill -f 'python -m connect4_az.cli train --run-root logs --run-name
+  │ smoke4' || true
+  └ (no output)
+
+• Ran . .venv/bin/activate && python -m connect4_az.cli train --run-root logs
+  │ --run-name smoke4 --time-budget-hours 0.03 --device cuda --model-channels
+  │ 32 --model-blocks 2 --batch-size 64 --epochs-per-round 1
+  │ … +3 lines
+  └ [2026-03-25 08:34:58] starting training on device=cuda
+    [2026-03-25 08:34:58] config bootstrap_target=32 self_play_games_per_round=2
+    … +39 lines
+    optimal_move_accuracy=0.750 mean_root_value_error=0.881
+    [2026-03-25 08:35:43] running self-play round games=2 current_replay=128
+
+─ Worked for 1m 43s ────────────────────────────────────────────────────────────
+
+• The remaining strategic gap is the very first move. Exact midgame labels plus
+  self-play should eventually learn it, but there’s no reason to leave the empty
+  board ambiguous when the solved answer is known. I’m seeding one exact opening
+  example for the empty board with center as the target move.
+
+• Edited connect4_az/training.py (+8 -1)
+    339
+    340 +def opening_seed_examples() -> list[Example]:
+    341 +    policy = [0.0 for _ in range(COLS)]
+    342 +    policy[3] = 1.0
+    343 +    return [Example(current=0, mask=0, moves=0, policy=policy, value=1.
+         0)]
+    344 +
+    345 +
+    346  def train(config: TrainingConfig) -> dict[str, Any]:
+        ⋮
+    383      deadline = time.time() + config.time_budget_hours * 3600.0
+    378 -    exact_examples: list[Example] = []
+    384 +    exact_examples: list[Example] = opening_seed_examples()
+    385      self_play_examples: list[Example] = []
+        ⋮
+    388      total_self_play_games = 0
+    389 +    log_line(run_dir, "seeded exact opening examples for the empty-boar
+         d center move")
+    390
+
+• Ran python3 -m compileall connect4_az/training.py && . .venv/bin/activate &&
+  │ pytest -q
+  └ .......
+    [100%]
+    7 passed in 0.93s
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m launching the full 3-hour training job now with the real config, then I’ll
+  put the live monitor in the foreground and start checking the first benchmark/
+  save cycle for regressions before I leave it alone.
+
+• Ran RUN_NAME=main_20260325_0836 && mkdir -p logs/$RUN_NAME && . .venv/bin/
+  │ activate && nohup python -m connect4_az.cli train --run-root logs
+  │ --run-name $RUN_NAME --time-budget-hours 3.0 --device cuda
+  │ … +5 lines
+  └ 75733
+
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The foreground monitor is up, but it’s still showing the old smoke run, which
+  means the new trainer hasn’t updated logs/current_run.json yet. I’m checking
+  the background job’s stdout and process state now to make sure the real run
+  actually started and didn’t die before first write.
+
+• Ran cat logs/current_run.json 2>/dev/null || true
+  └ {
+      "pid": 75581,
+      "run_dir": "logs/smoke4"
+    }
+
+• Ran ps -p 75733 -o pid,etime,%cpu,%mem,cmd
+  └     PID     ELAPSED %CPU %MEM CMD
+
+• Explored
+  └ List main_20260325_0836
+
+• Ran sed -n '1,120p' logs/main_20260325_0836/stdout.log 2>/dev/null || true
+  └ (no output)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The launch command itself is fine, but the trainer process exited before
+  writing anything useful. I’m replaying that exact config in the foreground for
+  a few seconds to catch the startup failure directly, then I’ll relaunch it
+  detached the robust way.
+
+• The trainer itself is healthy when started directly. I’m keeping that run
+  alive and checking the monitor refresh so the foreground view tracks
+  debug_main instead of the dead smoke session.
+
+• Waited for background terminal · cd /home/johnk/Documents/connect4 && . .venv/
+bin/activate && python scripts/monitor.py
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name debug_main --time-budget-hours
+3.0 --device cuda --model-channels 128 --model-blocks 8 --batch-size 512
+--epochs-per-round 2 --bootstrap-target 16384 --bootstrap-chunk-size 256
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• The real run is now active under logs/debug_main; benchmark-set construction
+  is still in progress. I’m waiting for the first exact chunk and benchmark
+  cycle so I can see whether the opening seed plus the larger model are behaving
+  the way they should.
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name debug_main --time-budget-hours
+3.0 --device cuda --model-channels 128 --model-blocks 8 --batch-size 512
+--epochs-per-round 2 --bootstrap-target 16384 --bootstrap-chunk-size 256
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• The first exact chunk is slower than the small smokes, which is expected with
+  8 fresh worker processes and the larger chunk size. I’m checking process state
+  and log files in parallel rather than guessing.
+
+• Ran ps -p 75782 -o pid,etime,%cpu,%mem,cmd
+  └     PID     ELAPSED %CPU %MEM CMD
+      75782       01:20 40.8  4.0 python -m connect4_az.cli train --run-root
+    … +3 lines
+    --benchmark-size 96 --benchmark-sims 160 --self-play-games-per-round 24
+    --self-play-sims 96 --replay-limit 24000
+
+• Explored
+  └ Read train.log
+
+• Ran ps -ef | grep -E 'connect4_az.cli train|python -m connect4_az.cli train' |
+  │ grep -v grep
+  └ johnk      75782   73999 40 08:37 ?        00:00:32 python -m
+    connect4_az.cli train --run-root logs --run-name debug_main
+    … +59 lines
+    --benchmark-sims 160 --self-play-games-per-round 24 --self-play-sims 96
+    --replay-limit 24000
+
+• Ran nvidia-smi --query-compute-apps=pid,process_name,used_memory
+  │ --format=csv,noheader
+  └ 75782, python, 140 MiB
+
+─ Worked for 1m 29s ────────────────────────────────────────────────────────────
+
+• The main trainer is healthy: one coordinator plus eight CPU workers are
+  saturating the exact-label bootstrap, and the GPU is idle only because we’re
+  still in that first bootstrap chunk. I’m waiting for the chunk to finish so I
+  can check the first real benchmark on the large model.
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name debug_main --time-budget-hours
+3.0 --device cuda --model-channels 128 --model-blocks 8 --batch-size 512
+--epochs-per-round 2 --bootstrap-target 16384 --bootstrap-chunk-size 256
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• Waited for background terminal · cd /home/johnk/Documents/connect4 && . .venv/
+bin/activate && python scripts/monitor.py
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name debug_main --time-budget-hours
+3.0 --device cuda --model-channels 128 --model-blocks 8 --batch-size 512
+--epochs-per-round 2 --bootstrap-target 16384 --bootstrap-chunk-size 256
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• Bootstrap generation is slower than the rough micro-bench suggested, but it’s
+  still consistent with a 5-10 minute exact pretrain phase rather than a
+  failure. I’m letting it clear this first 2,048-position chunk before deciding
+  whether to retune the chunk size live.
+
+• The current state is simple: CPU-bound exact pretraining is underway, GPU will
+  light up once that chunk lands, and the live monitor is already attached to
+  logs/debug_main. I’m staying on it until the first benchmark lands so I can
+  judge whether the run is on track or needs a live config adjustment.
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name debug_main --time-budget-hours
+3.0 --device cuda --model-channels 128 --model-blocks 8 --batch-size 512
+--epochs-per-round 2 --bootstrap-target 16384 --bootstrap-chunk-size 256
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• The first large-model benchmark is in: after the first 2,048 exact bootstrap
+  positions, it is already preserving the exact outcome on all 96 benchmark
+  states and matching the exact move set on all of them. I’m checking the
+  opening metric explicitly now, because that’s the part I tightened the stop
+  criteria around.
+
+• Explored
+  └ Read latest_status.json, benchmark.jsonl
+
+─ Worked for 1m 37s ────────────────────────────────────────────────────────────
+
+• The opening probe is correct too: the current best checkpoint now plays center
+  on the empty board. I’m letting bootstrap continue into the next chunk and
+  then I’ll decide whether to run an out-of-sample exact holdout against the
+  saved checkpoint while training keeps going.
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name debug_main --time-budget-hours
+3.0 --device cuda --model-channels 128 --model-blocks 8 --batch-size 512
+--epochs-per-round 2 --bootstrap-target 16384 --bootstrap-chunk-size 256
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• The second exact chunk is back in the long CPU phase. That’s expected with the
+  current 2,048-position chunk size, so I’m waiting one more interval before I
+  consider shrinking it live for faster logging cadence.
+
+• I’m adding a stand-alone holdout evaluator while the bootstrap chunk runs.
+  That gives me a clean way to stress-test any saved checkpoint on a fresh exact
+  benchmark without touching the live trainer.
+
+• Ran cat > scripts/evaluate_holdout.py <<'EOF'
+  │ #!/usr/bin/env python3
+  │ from __future__ import annotations
+  │ … +53 lines
+  └ (no output)
+
+• Ran . .venv/bin/activate && python -m connect4_az.cli train --run-root logs
+  │ --run-name debug_main --time-budget-hours 3.0 --device cuda
+  │ --model-channels 128 --model-blocks 8 --batch-size 512 --epochs-per-round
+  │ … +3 lines
+  └ [2026-03-25 08:37:56] starting training on device=cuda
+    [2026-03-25 08:37:56] config bootstrap_target=16384
+    … +31 lines
+                       ~~~~~~~~~~~^^^^^^^^
+    KeyError: 1
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The tooling is in place now: live monitor, saved checkpoints, and a holdout
+  evaluator. I’m just letting the main run clear another bootstrap/baseline
+  cycle before I spend extra CPU on side evaluations.
+
+• Waited for background terminal
+
+• I hit a real benchmark bug: the fast path in Solver.analyze() intentionally
+  omits losing moves when a position is already winning, but the benchmark logic
+  needs the full move-value table to detect blunders. I’m adding a separate
+  full-analysis path for benchmark construction, then I’ll restart the main run.
+
+• Edited connect4_az/solver.py (+26 -1)
+     24          self._analysis_cache: dict[tuple[int, int], MoveAnalysis] = {}
+     25 +        self._full_analysis_cache: dict[tuple[int, int], MoveAnalysis]
+         = {}
+     26
+        ⋮
+    144
+    145 +    def analyze_full(self, position: Position) -> MoveAnalysis:
+    146 +        analysis_key = (position.current, position.mask)
+    147 +        cached = self._full_analysis_cache.get(analysis_key)
+    148 +        if cached is not None:
+    149 +            return cached
+    150 +
+    151 +        terminal = position.terminal_value()
+    152 +        if terminal is not None:
+    153 +            analysis = MoveAnalysis(value=terminal, move_values={})
+    154 +            self._full_analysis_cache[analysis_key] = analysis
+    155 +            return analysis
+    156
+    157 +        move_values: dict[int, int] = {}
+    158 +        for col in position.legal_moves():
+    159 +            if position.is_winning_move(col):
+    160 +                move_values[col] = 1
+    161 +            else:
+    162 +                child = position.play(col)
+    163 +                move_values[col] = -self.solve(child)
+    164 +        analysis = MoveAnalysis(value=max(move_values.values()), move_v
+         alues=move_values)
+    165 +        self._full_analysis_cache[analysis_key] = analysis
+    166 +        self._value_cache[self._key(position.current, position.mask)] =
+          analysis.value
+    167 +        return analysis
+    168 +
+    169 +
+    170  def build_benchmark_positions(
+        ⋮
+    186              continue
+    162 -        analysis = solver.analyze(position)
+    187 +        analysis = solver.analyze_full(position)
+    188          if analysis.value == -1 and len(position.legal_moves()) <= 2:
+
+• Edited tests/test_solver.py (+4 -0)
+     8      analysis = solver.analyze(position)
+     9 +    full_analysis = solver.analyze_full(position)
+    10      assert analysis.value == 1
+    11      assert analysis.optimal_moves == [0]
+    12 +    assert full_analysis.value == 1
+    13 +    assert full_analysis.optimal_moves == [0]
+    14 +    assert set(full_analysis.move_values) == set(position.legal_moves())
+    15
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The fix is in. I’m running the targeted solver test first, then the full
+  suite, and after that I’ll relaunch the main run cleanly.
+
+• Waited for background terminal · python3 -m compileall connect4_az/solver.py
+tests/test_solver.py && . .venv/bin/activate && pytest -q tests/test_solver.py
+&& pytest -q
+
+• The new full-analysis test is more expensive than I want in the suite. I’m
+  checking whether it’s just slow or if I need to trim the assertion to keep
+  tests fast without losing coverage of the bug fix.
+
+• Explored
+  └ Read test_solver.py
+
+• Ran ps -ef | grep -E 'pytest -q tests/test_solver.py|pytest -q' | grep -v grep
+  └ johnk      76195   73999  0 08:42 ?        00:00:00 /bin/bash -c python3 -m
+    compileall connect4_az/solver.py tests/test_solver.py && . .venv/bin/
+    … +2 lines
+    connect4/.venv/bin/python /home/johnk/Documents/connect4/.venv/bin/pytest -q
+    tests/test_solver.py
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The expensive full-analysis path isn’t worth keeping. I’m switching the
+  benchmark logic to a lazy fallback: build benchmarks with the fast solver
+  path, and only solve a non-cached move on demand if the model actually chooses
+  it. That preserves correctness and keeps both tests and runtime lean.
+
+• Edited 3 files (+6 -31)
+  └ connect4_az/solver.py (+1 -26)
+     24          self._analysis_cache: dict[tuple[int, int], MoveAnalysis] = {}
+     25 -        self._full_analysis_cache: dict[tuple[int, int], MoveAnalysis]
+         = {}
+     25
+        ⋮
+    142          return analysis
+    144 -
+    145 -    def analyze_full(self, position: Position) -> MoveAnalysis:
+    146 -        analysis_key = (position.current, position.mask)
+    147 -        cached = self._full_analysis_cache.get(analysis_key)
+    148 -        if cached is not None:
+    149 -            return cached
+    143
+    151 -        terminal = position.terminal_value()
+    152 -        if terminal is not None:
+    153 -            analysis = MoveAnalysis(value=terminal, move_values={})
+    154 -            self._full_analysis_cache[analysis_key] = analysis
+    155 -            return analysis
+    144
+    157 -        move_values: dict[int, int] = {}
+    158 -        for col in position.legal_moves():
+    159 -            if position.is_winning_move(col):
+    160 -                move_values[col] = 1
+    161 -            else:
+    162 -                child = position.play(col)
+    163 -                move_values[col] = -self.solve(child)
+    164 -        analysis = MoveAnalysis(value=max(move_values.values()), move_v
+         alues=move_values)
+    165 -        self._full_analysis_cache[analysis_key] = analysis
+    166 -        self._value_cache[self._key(position.current, position.mask)] =
+          analysis.value
+    167 -        return analysis
+    168 -
+    169 -
+    145  def build_benchmark_positions(
+        ⋮
+    161              continue
+    187 -        analysis = solver.analyze_full(position)
+    162 +        analysis = solver.analyze(position)
+    163          if analysis.value == -1 and len(position.legal_moves()) <= 2:
+
+  └ connect4_az/training.py (+5 -1)
+    290  ) -> dict[str, float]:
+    291 +    solver = Solver()
+    292      agent = AlphaZeroAgent(
+        ⋮
+    308          exact_value = int(item["value"])
+    308 -        chosen_value = move_values[chosen]
+    309 +        if chosen in move_values:
+    310 +            chosen_value = move_values[chosen]
+    311 +        else:
+    312 +            chosen_value = -solver.solve(position.play(chosen))
+    313          if chosen_value == exact_value:
+
+  └ tests/test_solver.py (+0 -4)
+     8      analysis = solver.analyze(position)
+     9 -    full_analysis = solver.analyze_full(position)
+     9      assert analysis.value == 1
+    10      assert analysis.optimal_moves == [0]
+    12 -    assert full_analysis.value == 1
+    13 -    assert full_analysis.optimal_moves == [0]
+    14 -    assert set(full_analysis.move_values) == set(position.legal_moves())
+    11
+
+• Ran python3 -m compileall connect4_az/solver.py connect4_az/training.py tests/
+  │ test_solver.py && . .venv/bin/activate && pytest -q tests/test_solver.py
+  │ && pytest -q
+  └ Compiling 'connect4_az/solver.py'...
+    Compiling 'connect4_az/training.py'...
+    Compiling 'tests/test_solver.py'...
+
+• Ran pkill -f 'pytest -q tests/test_solver.py' || true
+  └ (no output)
+
+• Ran python3 -m compileall connect4_az/solver.py tests/test_solver.py
+  │ && . .venv/bin/activate && pytest -q tests/test_solver.py && pytest -q
+  └ (no output)
+
+• Ran . .venv/bin/activate && pytest -q tests/test_solver.py && pytest -q
+  └ .......
+    [100%]
+    7 passed in 0.95s
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’ve fixed the benchmark crash and the tests are green again. I’m restarting
+  the real run now under a clean run name with a smaller exact chunk size so the
+  logs update more often and any future issue is cheaper to recover from.
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name main_run --time-budget-hours
+3.0 --device cuda --model-channels 128 --model-blocks 8 --batch-size 512
+--epochs-per-round 2 --bootstrap-target 16384 --bootstrap-chunk-size 128
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• main_run is live and has entered bootstrap with 1,024-position chunks. I’m
+  watching this restart through its first benchmark to confirm the crash is gone
+  under the new path.
+
+• Waited for background terminal · cd /home/johnk/Documents/connect4 && . .venv/
+bin/activate && python scripts/monitor.py
+
+• main_run is the only live trainer now, and the monitor has caught up to it.
+  I’m waiting for its first benchmark cycle after the 1,024-example chunk so I
+  can confirm the fixed benchmark path is stable under the real run.
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name main_run --time-budget-hours
+3.0 --device cuda --model-channels 128 --model-blocks 8 --batch-size 512
+--epochs-per-round 2 --bootstrap-target 16384 --bootstrap-chunk-size 128
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• Explored
+  └ Read latest_status.json
+
+─ Worked for 2m 06s ────────────────────────────────────────────────────────────
+
+• The fixed benchmark path is stable. After just 1,024 exact labels plus the
+  opening seed, the large model is already at 95/96 on the exact benchmark and
+  still opening in the center. I’m letting it take the next chunk before I spend
+  extra cycles on a separate holdout.
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name main_run --time-budget-hours
+3.0 --device cuda --model-channels 128 --model-blocks 8 --batch-size 512
+--epochs-per-round 2 --bootstrap-target 16384 --bootstrap-chunk-size 128
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• The second round dipped, which points to some training volatility rather than
+  a broken run. Best-checkpoint tracking protects us here, so I’m evaluating the
+  saved best checkpoint on a fresh exact holdout now to see whether that first
+  round was genuinely strong or just lucky on the in-run benchmark.
+
+• The holdout evaluation is running against the saved best.pt, not the live
+  mutable model, so even if training wiggles I’ll have a clean out-of-sample
+  read on the strongest checkpoint seen so far.
+
+• Waited for background terminal · . .venv/bin/activate && python scripts/
+evaluate_holdout.py --checkpoint logs/main_run/checkpoints/best.pt --size 64
+--seed 20260325 --min-moves 16 --max-moves 30 --sims 320 --device cuda
+
+• Ran . .venv/bin/activate && python scripts/evaluate_holdout.py --checkpoint
+  │ logs/main_run/checkpoints/best.pt --size 64 --seed 20260325 --min-moves 16
+  │ --max-moves 30 --sims 320 --device cuda
+  └ {
+      "checkpoint": "logs/main_run/checkpoints/best.pt",
+    … +60 lines
+      "sims": 320
+    }
+
+─ Worked for 1m 32s ────────────────────────────────────────────────────────────
+
+• The first out-of-sample holdout came back clean: 64/64 exact-outcome
+  preservation and 64/64 exact-move agreement, with the center opening still
+  correct. I’m pushing one larger holdout now to see if that result holds at a
+  more meaningful sample size.
+
+• Waited for background terminal · . .venv/bin/activate && python scripts/
+evaluate_holdout.py --checkpoint logs/main_run/checkpoints/best.pt --size 128
+--seed 20260326 --min-moves 16 --max-moves 30 --sims 512 --device cuda
+
+• Ran . .venv/bin/activate && python scripts/evaluate_holdout.py --checkpoint
+  │ logs/main_run/checkpoints/best.pt --size 128 --seed 20260326 --min-moves
+  │ 16 --max-moves 30 --sims 512 --device cuda
+  └ {
+      "checkpoint": "logs/main_run/checkpoints/best.pt",
+    … +60 lines
+      "sims": 512
+    }
+
+─ Worked for 1m 05s ────────────────────────────────────────────────────────────
+
+• The larger holdout is a more realistic picture: 123/128 exact-outcome
+  preservation and exact-move agreement at 512 simulations. That is already
+  strong enough to embarrass most humans, but it is not where I want to stop if
+  the goal is “near optimal,” so I’m keeping the run going and watching for a
+  better checkpoint.
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name main_run --time-budget-hours
+3.0 --device cuda --model-channels 128 --model-blocks 8 --batch-size 512
+--epochs-per-round 2 --bootstrap-target 16384 --bootstrap-chunk-size 128
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• The bootstrap phase is behaving consistently now: each 1,024-position chunk is
+  about a minute, training is stable, and the benchmark is hovering in the high
+  97-99% range. I’m checking the next checkpoint because this is roughly where
+  I’d expect either a new best or a clear plateau.
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name main_run --time-budget-hours
+3.0 --device cuda --model-channels 128 --model-blocks 8 --batch-size 512
+--epochs-per-round 2 --bootstrap-target 16384 --bootstrap-chunk-size 128
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• The current best model is clearly strong, but the training benchmark is mostly
+  plateauing rather than climbing. The important unknown now is whether self-
+  play will convert that midgame exactness into more robust overall play, so I’m
+  letting bootstrap finish and then I’ll re-evaluate once the first self-play
+  checkpoints exist.
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name main_run --time-budget-hours
+3.0 --device cuda --model-channels 128 --model-blocks 8 --batch-size 512
+--epochs-per-round 2 --bootstrap-target 16384 --bootstrap-chunk-size 128
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• The learning curve is telling me something useful now: the first supervised
+  checkpoint is excellent, and more high-LR bootstrap is not clearly improving
+  it. I’m adding a weight-resume path so I can branch into a lower-LR fine-tune
+  run from the strongest saved checkpoint instead of blindly grinding the
+  current trajectory.
+
+• Edited 2 files (+12 -2)
+  └ connect4_az/cli.py (+2 -0)
+    129          run_dir=run_dir,
+    130 +        resume_checkpoint=args.resume_checkpoint,
+    131          seed=args.seed,
+        ⋮
+    165      train_parser.add_argument("--run-name")
+    166 +    train_parser.add_argument("--resume-checkpoint")
+    167      train_parser.add_argument("--seed", type=int, default=7)
+
+  └ connect4_az/training.py (+10 -2)
+     18  from .game import COLS, Position, random_position
+     19 -from .network import ModelConfig, create_model, save_checkpoint
+     19 +from .network import ModelConfig, create_model, load_checkpoint, save_c
+         heckpoint
+     20  from .solver import Solver, build_benchmark_positions
+        ⋮
+     25      run_dir: Path
+     26 +    resume_checkpoint: str | None = None
+     27      seed: int = 7
+        ⋮
+    367      model_config = ModelConfig(channels=config.model_channels, blocks=c
+         onfig.model_blocks)
+    367 -    model = create_model(model_config, device)
+    368 +    if config.resume_checkpoint:
+    369 +        model, loaded_config, resume_metadata = load_checkpoint(Path(co
+         nfig.resume_checkpoint), device)
+    370 +        model_config = loaded_config
+    371 +        log_line(run_dir, f"loaded weights from checkpoint={config.resu
+         me_checkpoint}")
+    372 +        if resume_metadata:
+    373 +            log_line(run_dir, f"resume metadata keys={sorted(resume_met
+         adata.keys())}")
+    374 +    else:
+    375 +        model = create_model(model_config, device)
+    376      optimizer = optim.AdamW(model.parameters(), lr=config.learning_rate
+         , weight_decay=config.weight_decay)
+
+• Ran python3 -m compileall connect4_az/training.py connect4_az/cli.py
+  │ && . .venv/bin/activate && pytest -q
+  └ .......
+    [100%]
+    7 passed in 0.96s
+
+• Waited for background terminal
+
+─ Worked for 5m 22s ────────────────────────────────────────────────────────────
+
+• I have what I need from main_run: a strong supervised checkpoint plus evidence
+  that continuing that high-LR bootstrap path is mostly churning. I’m stopping
+  it and pivoting into a lower-LR fine-tune run from its best checkpoint so the
+  remaining time goes toward actual improvement instead of drift.
+
+• Ran pkill -f 'python -m connect4_az.cli train --run-root logs --run-name
+  │ main_run' || true
+  └ (no output)
+
+• Ran . .venv/bin/activate && python -m connect4_az.cli train --run-root logs
+  │ --run-name main_run --time-budget-hours 3.0 --device cuda --model-channels
+  │ 128 --model-blocks 8 --batch-size 512 --epochs-per-round 2
+  │ … +3 lines
+  └ [2026-03-25 08:43:31] starting training on device=cuda
+    [2026-03-25 08:43:31] config bootstrap_target=16384
+    … +43 lines
+    optimal_move_accuracy=0.948 mean_root_value_error=0.224
+    [2026-03-25 08:53:28] generating exact chunk size=1024 current_exact=9217
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The fine-tune branch is live and has resumed from the strong main_run
+  checkpoint with a lower learning rate. I’m treating this as the real run now
+  and waiting for its first benchmark cycle to see whether the lower-LR branch
+  holds the earlier strength while we transition into self-play.
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name finetune_main --resume-
+checkpoint logs/main_run/checkpoints/best.pt --time-budget-hours 2.8 --device
+cuda --learning-rate 0.0003 --model-channels 128 --model-blocks 8 --batch-size
+512 --epochs-per-round 2 --bootstrap-target 2049 --bootstrap-chunk-size 128
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• The lower-LR branch is doing exactly what I wanted at the first checkpoint: it
+  held 96/96 on the training benchmark after another exact chunk and re-saved a
+  best checkpoint. One more exact chunk gets it out of bootstrap and into self-
+  play, which is the phase I care about most now.
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name finetune_main --resume-
+checkpoint logs/main_run/checkpoints/best.pt --time-budget-hours 2.8 --device
+cuda --learning-rate 0.0003 --model-channels 128 --model-blocks 8 --batch-size
+512 --epochs-per-round 2 --bootstrap-target 2049 --bootstrap-chunk-size 128
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• The fine-tune checkpoint has now hit 96/96 on the exact benchmark with the
+  center opening intact and has moved into self-play. I’m running the same
+  larger holdout against this new best.pt now to see whether the lower-LR branch
+  actually improved the out-of-sample numbers.
+
+• Waited for background terminal · . .venv/bin/activate && python scripts/
+evaluate_holdout.py --checkpoint logs/finetune_main/checkpoints/best.pt --size
+128 --seed 20260326 --min-moves 16 --max-moves 30 --sims 512 --device cuda
+
+• Ran . .venv/bin/activate && python scripts/evaluate_holdout.py --checkpoint
+  │ logs/finetune_main/checkpoints/best.pt --size 128 --seed 20260326
+  │ --min-moves 16 --max-moves 30 --sims 512 --device cuda
+  └ {
+      "checkpoint": "logs/finetune_main/checkpoints/best.pt",
+    … +61 lines
+      "sims": 512
+    }
+
+─ Worked for 3m 50s ────────────────────────────────────────────────────────────
+
+• The lower-LR branch matches the earlier 128-position holdout exactly so far:
+  still 123/128 at 512 simulations. That means the supervised side is stable,
+  not yet better. The real question is whether self-play pushes the search-
+  guided policy higher, so I’m waiting for the first self-play checkpoints
+  before I judge it further.
+
+• Waited for background terminal · . .venv/bin/activate && python -m
+connect4_az.cli train --run-root logs --run-name finetune_main --resume-
+checkpoint logs/main_run/checkpoints/best.pt --time-budget-hours 2.8 --device
+cuda --learning-rate 0.0003 --model-channels 128 --model-blocks 8 --batch-size
+512 --epochs-per-round 2 --bootstrap-target 2049 --bootstrap-chunk-size 128
+--bootstrap-workers 8 --benchmark-size 96 --benchmark-sims 160 --self-play-
+games-per-round 24 --self-play-sims 96 --replay-limit 24000
+
+• The first self-play block is materially slower than bootstrap, which is
+  expected because this is where the GPU and tree search finally matter. I’m
+  checking the live log file directly now so I can tell whether it’s progressing
+  normally or whether the per-round game count is too high for the remaining
+  budget.
+
+• Explored
+  └ Read train.log
+
+• Ran ps -ef | grep -E 'finetune_main' | grep -v grep
+  └ johnk      77121   73999 73 08:53 ?        00:05:10 python -m
+    connect4_az.cli train --run-root logs --run-name finetune_main
+    … +4 lines
+    --benchmark-sims 160 --self-play-games-per-round 24 --self-play-sims 96
+    --replay-limit 24000
+
+• Ran nvidia-smi --query-compute-apps=pid,process_name,used_memory
+  │ --format=csv,noheader
+  └ 77121, python, 534 MiB
+
+─ Worked for 3m 20s ────────────────────────────────────────────────────────────
+
+• The supervised branch is already strong enough that search depth may be the
+  deciding factor now. I’m running a 64-position holdout at 1600 simulations,
+  which matches the intended interactive play setting much more closely than the
+  512-sim diagnostic.
+
+• Waited for background terminal · . .venv/bin/activate && python scripts/
+evaluate_holdout.py --checkpoint logs/finetune_main/checkpoints/best.pt --size
+64 --seed 20260327 --min-moves 16 --max-moves 30 --sims 1600 --device cuda
+
+• Ran . .venv/bin/activate && python scripts/evaluate_holdout.py --checkpoint
+  │ logs/finetune_main/checkpoints/best.pt --size 64 --seed 20260327
+  │ --min-moves 16 --max-moves 30 --sims 1600 --device cuda
+  └ {
+      "checkpoint": "logs/finetune_main/checkpoints/best.pt",
+    … +61 lines
+      "sims": 1600
+    }
+
+────────────────────────────────────────────────────────────────────────────────
+
+• At the intended interactive search depth, the current best checkpoint just
+  went 64/64 on a fresh exact holdout with the center opening intact. I’m
+  scaling that same test to 128 positions now; if it stays this clean, I’ll have
+  a much stronger basis for calling the agent near-optimal in practice.
+
+• Waited for background terminal · . .venv/bin/activate && python scripts/
+evaluate_holdout.py --checkpoint logs/finetune_main/checkpoints/best.pt --size
+128 --seed 20260327 --min-moves 16 --max-moves 30 --sims 1600 --device cuda
+
+• Ran . .venv/bin/activate && python scripts/evaluate_holdout.py --checkpoint
+  │ logs/finetune_main/checkpoints/best.pt --size 128 --seed 20260327
+  │ --min-moves 16 --max-moves 30 --sims 1600 --device cuda
+  └ {
+      "checkpoint": "logs/finetune_main/checkpoints/best.pt",
+    … +61 lines
+      "sims": 1600
+    }
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The search-depth picture is much better: at the exact same 1600 simulations I
+  plan to use for play, the current best checkpoint just went 127/128 on a fresh
+  128-position holdout. I’m running one last larger holdout to stress that
+  conclusion before I decide whether I’ve crossed the “near optimal in practice”
+  bar.
+
+• Waited for background terminal · . .venv/bin/activate && python scripts/
+evaluate_holdout.py --checkpoint logs/finetune_main/checkpoints/best.pt --size
+256 --seed 20260328 --min-moves 16 --max-moves 30 --sims 1600 --device cuda
+
+• The 256-position stress test is still running, which is expected at 1600
+  simulations. I’m letting it finish rather than cutting it short, because this
+  is the most decision-useful piece of evidence I can collect for the “near
+  optimal” claim.
+
+• Waited for background terminal · . .venv/bin/activate && python scripts/
+evaluate_holdout.py --checkpoint logs/finetune_main/checkpoints/best.pt --size
+256 --seed 20260328 --min-moves 16 --max-moves 30 --sims 1600 --device cuda
+
+• Ran . .venv/bin/activate && python scripts/evaluate_holdout.py --checkpoint
+  │ logs/finetune_main/checkpoints/best.pt --size 256 --seed 20260328
+  │ --min-moves 16 --max-moves 30 --sims 1600 --device cuda
+  └ {
+      "checkpoint": "logs/finetune_main/checkpoints/best.pt",
+    … +61 lines
+      "sims": 1600
+    }
+
+─ Worked for 2m 54s ────────────────────────────────────────────────────────────
+
+• The larger 256-position stress test came back at 248/256 exact-outcome
+  preservation and exact-move agreement at 1600 simulations. That is not
+  mathematically optimal, but it is squarely in the “near optimal in practice”
+  range for this game. I’m checking whether the live self-play run has already
+  produced a better checkpoint than this supervised best before I lock in that
+  judgment.
+
+• Explored
+  └ Read train.log, latest_status.json
+    List checkpoints
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The first self-play round finished cleanly, but it did not beat the saved
+  supervised best on the in-run benchmark. I’m comparing latest.pt directly
+  against the holdout next, because the lower mean value error could still mean
+  it’s the stronger practical search checkpoint even if the discrete benchmark
+  tie-breaker didn’t promote it.
+
+• Waited for background terminal · . .venv/bin/activate && python scripts/
+evaluate_holdout.py --checkpoint logs/finetune_main/checkpoints/latest.pt --size
+128 --seed 20260327 --min-moves 16 --max-moves 30 --sims 1600 --device cuda
+
+• Ran . .venv/bin/activate && python scripts/evaluate_holdout.py --checkpoint
+  │ logs/finetune_main/checkpoints/latest.pt --size 128 --seed 20260327
+  │ --min-moves 16 --max-moves 30 --sims 1600 --device cuda
+  └ {
+      "checkpoint": "logs/finetune_main/checkpoints/latest.pt",
+    … +61 lines
+      "sims": 1600
+    }
+
+────────────────────────────────────────────────────────────────────────────────
+
+• latest.pt after one self-play round matches the supervised best on the 128-
+  position 1600-sim holdout and improves the value calibration noticeably. I’m
+  doing the same 256-position stress test on latest.pt; if it matches or beats
+  the earlier 248/256, that’s enough evidence for me to prefer the self-play-
+  updated checkpoint for actual play.
+
+• Waited for background terminal · . .venv/bin/activate && python scripts/
+evaluate_holdout.py --checkpoint logs/finetune_main/checkpoints/latest.pt --size
+256 --seed 20260328 --min-moves 16 --max-moves 30 --sims 1600 --device cuda
+
+• The 256-position latest.pt stress test is still in flight. I’m letting it
+  finish because it’s the cleanest way to decide whether the first self-play
+  checkpoint actually beats the pure supervised one at the exact interactive
+  search budget.
+
+• Waited for background terminal · . .venv/bin/activate && python scripts/
+evaluate_holdout.py --checkpoint logs/finetune_main/checkpoints/latest.pt --size
+256 --seed 20260328 --min-moves 16 --max-moves 30 --sims 1600 --device cuda
+
+• Ran . .venv/bin/activate && python scripts/evaluate_holdout.py --checkpoint
+  │ logs/finetune_main/checkpoints/latest.pt --size 256 --seed 20260328
+  │ --min-moves 16 --max-moves 30 --sims 1600 --device cuda
+  └ {
+      "checkpoint": "logs/finetune_main/checkpoints/latest.pt",
+    … +61 lines
+      "sims": 1600
+    }
+
+─ Worked for 2m 52s ────────────────────────────────────────────────────────────
+
+• I have enough evidence to recommend a checkpoint, so I’m writing the measured
+  holdout results into the run directory now. That way when you get back, the
+  strength claim is documented on disk alongside the model instead of only
+  living in this chat.
+
+• Ran cat > logs/finetune_main/manual_eval_summary.json <<'EOF'
+  │ {
+  │   "recommended_checkpoint": "logs/finetune_main/checkpoints/best.pt",
+  │ … +70 lines
+  └ (no output)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m also copying the recommended checkpoint to a stable top-level path so the
+  play scripts won’t depend on whichever run happens to be current later.
+
+• Ran mkdir -p checkpoints && cp logs/finetune_main/checkpoints/best.pt
+  │ checkpoints/recommended.pt
+  └ (no output)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m adding fixed-target play scripts that point at the recommended checkpoint
+  explicitly. That avoids any ambiguity if the background training run updates
+  latest.pt again while you’re away.
+
+• Ran cat > scripts/play_recommended_second.sh <<'EOF'
+  │ #!/usr/bin/env bash
+  │ set -euo pipefail
+  │ … +18 lines
+  └ (no output)
+
+• Ran ./scripts/play_recommended_second.sh --help | sed -n '1,40p'
+  └ usage: connect4-az play [-h] [--checkpoint CHECKPOINT] [--device DEVICE]
+                            [--sims SIMS] [--human-first] [--human-second]
+    … +9 lines
+      --move-delay MOVE_DELAY
+      --no-color
+
+• Explored
+  └ Read train.log, current_run.json
+
+• Ran ps -ef | grep -E 'finetune_main' | grep -v grep
+  └ johnk      77121   73999 88 08:53 ?        00:14:10 python -m
+    connect4_az.cli train --run-root logs --run-name finetune_main
+    … +4 lines
+    --benchmark-sims 160 --self-play-games-per-round 24 --self-play-sims 96
+    --replay-limit 24000
+
+────────────────────────────────────────────────────────────────────────────────
+
+• Built the full stack and I’m confident the current recommended checkpoint is
+  near-optimal in practice for human play.
+
+  Status
+
+  - Recommended checkpoint: checkpoints/recommended.pt
+  - Live training is still running in logs/finetune_main and the foreground
+    monitor is tracking it.
+  - Tests pass: 7 passed
+
+  Why I’m confident
+
+  - Exact holdouts at the intended interactive search depth of 1600 MCTS sims:
+  - 64/64 exact-outcome preservation and exact-move agreement
+  - 127/128 exact-outcome preservation and exact-move agreement
+  - 248/256 exact-outcome preservation and exact-move agreement
+  - Empty-board opening chose center in all of those evals
+  - I saved the eval record in logs/finetune_main/manual_eval_summary.json
+
+  Play
+
+  1. AI first, human second:
+
+  ./scripts/play_recommended_second.sh
+
+  2. Human first:
+
+  ./scripts/play_recommended_first.sh
+
+  That gives the physical-style board and only asks for a column 1 through 7.
+
+  Monitor / Logs
+
+  - Current run log: logs/finetune_main/train.log
+  - Eval summary: logs/finetune_main/manual_eval_summary.json
+  - If you need to reopen the live monitor:
+
+  ./scripts/monitor.sh
+
+  If you want the moving target instead of the frozen recommended checkpoint,
+  use:
+
+  ./scripts/play_second.sh
+
+  or
+
+  ./scripts/play_first.sh
+
+
+› hey my friend is here so wrap it up in the next 2-3 mins please!
+
+
+• I’m stopping the live training now so the machine is free for play, then I’ll
+  give you the shortest possible handoff: the checkpoint to use and the exact
+  commands for first or second player.
+
+• Ran pkill -f 'python -m connect4_az.cli train --run-root logs --run-name
+  │ finetune_main' || true
+  └ (no output)
+
+• Ran cd /home/johnk/Documents/connect4 && . .venv/bin/activate && python
+  │ scripts/monitor.py
+  └ ============================================================================
+    ====
+    … +14929 lines
+    ============================================================================
+    ====
+
+• Ran pkill -f 'python scripts/monitor.py' || true
+  └ (no output)
+
+• Ran ps -ef | grep -E 'finetune_main|scripts/monitor.py' | grep -v grep || true
+  └ johnk      75743   73999  0 08:37 pts/2    00:00:00 python scripts/
+    monitor.py
+    … +2 lines
+    johnk      83723   83721  0 11:01 ?        00:00:00 pkill -f python scripts/
+    monitor.py
+
+────────────────────────────────────────────────────────────────────────────────
+
+• The trainer is down; the old monitor PTY is the only thing still hanging
+  around. I’m killing that PID directly so nothing competes with the play
+  session.
+
+• Ran kill 75743 && ps -ef | grep -E 'finetune_main|scripts/monitor.py' | grep
+  │ -v grep || true
+  └ /bin/bash: line 1: kill: (75743) - No such process
+
+• Ran ps -ef | grep -E 'finetune_main|scripts/monitor.py' | grep -v grep || true
+  └ (no output)
+
+────────────────────────────────────────────────────────────────────────────────
+
+• I’m doing one last smoke check on the fixed play script with a quit input so
+  you don’t discover a CLI issue while your friend is standing there.
+
+• Ran printf 'q\n' | ./scripts/play_recommended_second.sh --no-color | sed -n
+  │ '1,20p'
+  └ Loaded checkpoint: checkpoints/recommended.pt
+    Benchmark: outcome_preservation=1.0 optimal_move_accuracy=1.0
+    … +16 lines
+    +---+---+---+---+---+---+---+
+    AI drops into column 4.
+
+• Waited for background terminal
+
+────────────────────────────────────────────────────────────────────────────────
+
+• Training and monitor are stopped. GPU/CPU are free for play.
+
+  Use this now:
+
+  1. AI first, your friend second:
+
+  ./scripts/play_recommended_second.sh
+
+  2. Your friend first:
+
+  ./scripts/play_recommended_first.sh
+
+  Recommended checkpoint:
+
+  - checkpoints/recommended.pt
+
+  Why this checkpoint:
+
+  - At 1600 MCTS sims:
+  - 64/64 exact holdout
+  - 127/128 exact holdout
+  - 248/256 exact holdout
+  - Empty-board move was always center
+
+  Saved eval summary:
+
+  - logs/finetune_main/manual_eval_summary.json
+
+  If you want the run logs:
+
+  - logs/finetune_main/train.log
+
+  I would use recommended.pt, not latest.pt.
+Token usage: total=1,259,923 input=1,174,595 (+ 19,311,104 cached) output=85,328 (reasoning 44,192)
+To continue this session, run codex resume 019d251e-5457-7341-894b-00374bd894f6
+johnk@rt1:~/Documents/connect4$ ./scripts/play_recommended_second.sh
+Loaded checkpoint: checkpoints/recommended.pt
+Benchmark: outcome_preservation=1.0 optimal_move_accuracy=1.0
+Type a column number from 1 to 7. Ctrl+C exits.
+You are playing the physical-style board view below.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+AI drops into column 4.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 4
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+AI drops into column 4.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 4
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+AI drops into column 2.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | . | O | . | . | . |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 3
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+AI drops into column 2.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 2
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+AI drops into column 3.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 3
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+AI drops into column 2.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 7
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | O |
++---+---+---+---+---+---+---+
+AI drops into column 2.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | . | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 3
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | O |
++---+---+---+---+---+---+---+
+AI drops into column 3.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 4
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | O |
++---+---+---+---+---+---+---+
+AI drops into column 5.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 5
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+AI drops into column 5.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 5
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+AI drops into column 7.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 7
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+AI drops into column 7.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | . | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 3
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | O | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+AI drops into column 7.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | O | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 6
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | O | . | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+AI drops into column 4.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 6
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | . | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+AI drops into column 2.
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Choose a column (1-7): 6 
+
+  1   2   3   4   5   6   7
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | . |
++---+---+---+---+---+---+---+
+| . | O | O | O | . | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | . | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+| . | O | O | O | O | O | O |
++---+---+---+---+---+---+---+
+Game over: human wins.
+johnk@rt1:~/Documents/connect4$ 
+
